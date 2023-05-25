@@ -1,12 +1,15 @@
-use std::env;
+use std::{env, fs, process::exit};
 
 enum YeetOptions {
     Init,
 }
 
-fn parse_args() -> Option<(YeetOptions, Option<Vec<String>>)> {
-    let args = env::args().collect::<Vec<String>>();
+struct Config {
+    command: YeetOptions,
+    args: Option<Vec<String>>,
+}
 
+fn parse_args(args: &[String]) -> Option<Config> {
     // No arguments given
     if args.len() == 1 {
         println!("No args provided");
@@ -22,7 +25,10 @@ fn parse_args() -> Option<(YeetOptions, Option<Vec<String>>)> {
             print_help();
             return None;
         } else {
-            return Some((YeetOptions::Init, None));
+            return Some(Config {
+                command: YeetOptions::Init,
+                args: None,
+            });
         }
     }
 
@@ -36,13 +42,25 @@ fn print_help() {
 }
 
 fn init_repo() {
-    todo!();
+    let res = fs::create_dir("./.yeet");
+    match res {
+        Err(e) => {
+            println!("Error creating repo: {}", e);
+            exit(1);
+        }
+        Ok(_) => {
+            println!(
+                "created empty repo in {}",
+                env::current_dir().unwrap().to_string_lossy()
+            );
+        }
+    }
 }
 
 fn main() {
-    let args = parse_args();
-    if let Some(a) = args {
-        match a.0 {
+    let args = env::args().collect::<Vec<String>>();
+    if let Some(config) = parse_args(&args) {
+        match config.command {
             YeetOptions::Init => {
                 init_repo();
             }
