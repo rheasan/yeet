@@ -9,6 +9,32 @@ fn main() {
             yeet::Options::Init => {
                 yeet::init_repo();
             }
+            yeet::Options::CatFile => {
+                let file_path = config.args;
+                match file_path {
+                    Some(path) => {
+                        if let Err(e) = yeet::cat_file(&path) {
+                            println!("Error: {}", e);
+                        }
+                    }
+                    None => {
+                        unreachable!();
+                    }
+                }
+            }
+            yeet::Options::HashFile => {
+                let file_path = config.args;
+                match file_path {
+                    Some(path) => {
+                        if let Err(e) = yeet::hash_file(&path) {
+                            println!("Error: {}", e);
+                        }
+                    }
+                    None => {
+                        unreachable!();
+                    }
+                }
+            }
         }
     }
 }
