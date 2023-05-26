@@ -34,6 +34,9 @@ fn main() {
                     }
                 }
             }
+            cli::Options::WriteTree => {
+                yeet::write_tree(String::from("."));
+            }
         }
     }
 }

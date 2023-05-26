@@ -2,6 +2,7 @@ pub enum Options {
     Init,
     CatFile,
     HashFile,
+    WriteTree,
 }
 
 pub struct Config {
@@ -57,6 +58,17 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
             return Some(Config {
                 command: Options::HashFile,
                 args: Some(args[2].clone()),
+            });
+        }
+    } else if args[1] == "writetree" {
+        if args.len() > 2 {
+            println!("Too many arguments");
+            print_help();
+            return None;
+        } else {
+            return Some(Config {
+                command: Options::WriteTree,
+                args: None,
             });
         }
     }

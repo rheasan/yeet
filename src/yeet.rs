@@ -47,3 +47,22 @@ pub fn hash_file(path: &String) {
         println!("Error: {}", e);
     }
 }
+
+pub fn write_tree(path: String) {
+    let dir_entries = fs::read_dir(path).expect("Failed to read directory");
+
+    for i in dir_entries {
+        let entry = i.expect("Failed to read entry");
+        if entry.file_name() == ".git" || entry.file_name() == "target" {
+            continue;
+        }
+        let file_metadata = entry.metadata().expect("Failed to read metadata");
+
+        if file_metadata.is_dir() {
+            let path = entry.path().clone();
+            write_tree(String::from(path.to_str().unwrap()));
+        } else {
+            println!("{}", entry.file_name().to_string_lossy());
+        }
+    }
+}
