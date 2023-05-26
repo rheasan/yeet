@@ -98,18 +98,18 @@ fn print_help() {
     println!("Usage: TODO");
 }
 
-fn hash_obj(t: &String) -> u64 {
+fn hash_obj(t: &[u8]) -> u64 {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
     s.finish()
 }
 
-fn write_hash(data: &String, path: &String) -> Result<(), String> {
+fn write_hash(data: &[u8], path: &String) -> Result<(), String> {
     let obj_file = File::create(path);
     if let Err(_) = obj_file {
         return Err("Error creating file".to_string());
     }
-    if let Err(_) = obj_file.unwrap().write_all(data.as_bytes()) {
+    if let Err(_) = obj_file.unwrap().write_all(data) {
         return Err("Error writing to file".to_string());
     }
     Ok(())
@@ -129,7 +129,7 @@ pub fn cat_file(hash: &String) -> Result<(), String> {
 }
 
 pub fn hash_file(path: &String) -> Result<(), String> {
-    let file_data = fs::read_to_string(path);
+    let file_data = fs::read(path);
 
     match file_data {
         Err(_) => Err(String::from("Error reading file at") + path.as_str()),
@@ -158,7 +158,7 @@ mod tests {
         let a = String::from("new random string");
         let b = String::from("new random string");
 
-        assert_eq!(hash_obj(&a), hash_obj(&b));
+        assert_eq!(hash_obj(a.as_bytes()), hash_obj(b.as_bytes()));
     }
 
     #[test]
@@ -169,17 +169,17 @@ mod tests {
         let a = String::from("new random string");
         let b = String::from("new random string");
 
-        let a_hash = hash_obj(&a);
-        let b_hash = hash_obj(&b);
+        let a_hash = hash_obj(a.as_bytes());
+        let b_hash = hash_obj(b.as_bytes());
 
         let a_path = String::from("./.test/") + a_hash.to_string().as_str();
         let b_path = String::from("./.test/") + b_hash.to_string().as_str();
 
         // write hashes of both strings
-        if let Err(_) = write_hash(&a, &a_path) {
+        if let Err(_) = write_hash(a.as_bytes(), &a_path) {
             assert!(false, "failed to write a hash");
         }
-        if let Err(_) = write_hash(&b, &b_path) {
+        if let Err(_) = write_hash(b.as_bytes(), &b_path) {
             assert!(false, "failed to write b hash");
         }
 
