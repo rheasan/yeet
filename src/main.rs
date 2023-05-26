@@ -1,3 +1,4 @@
+#![feature(fs_try_exists)]
 use std::env;
 
 pub mod cli;
