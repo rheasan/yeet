@@ -122,25 +122,24 @@ fn write_hash(data: &[u8], path: &String, data_type: &String) -> Result<(), Stri
     Ok(())
 }
 
-pub fn cat_file(hash: &String) -> Result<(), String> {
-    let path = String::from("./.yeet/objects/") + hash.as_str();
+// TODO: find better way to do this
+// path == None for normal usage
+pub fn cat_file(hash: &String, path_prefix: &String) -> Result<[Vec<u8>; 2], String> {
+    let path = path_prefix.clone() + hash.as_str();
     let file_bytes = fs::read(&path);
 
     match file_bytes {
-        Err(_) => Err(String::from("Error reading file at ") + path.as_str()),
+        Err(e) => {
+            Err(String::from("Error reading file at ") + path.as_str() + e.to_string().as_str())
+        }
         Ok(data) => {
             // split the bytes at the separator
             let mut iter = data.split(|&x| x == SEPARATOR.into());
             let data_type = iter.next().expect("Error reading file");
             let file_data = iter.collect::<Vec<&[u8]>>().concat();
-
             // data type will always be valid ascii;
-            println!(
-                "obj-type: {}",
-                String::from_utf8(data_type.to_vec()).unwrap()
-            );
-            println!("file-data: {:?}", file_data);
-            Ok(())
+
+            return Ok([data_type.to_vec(), file_data]);
         }
     }
 }
@@ -169,7 +168,7 @@ mod tests {
     use crate::yeet::hash_obj;
     use std::fs;
 
-    use super::write_hash;
+    use super::{cat_file, write_hash};
 
     #[test]
     fn hash_works() {
@@ -181,26 +180,48 @@ mod tests {
 
     #[test]
     fn hash_writing_works() {
-        if let Err(_) = fs::create_dir("./.test") {
+        if let Err(_) = fs::create_dir("./.tests/hash_writing_works") {
             assert!(false, "failed to create test dir");
         }
         let a = String::from("new random string");
-        let b = String::from("new random string");
 
         let a_hash = hash_obj(a.as_bytes());
-        let b_hash = hash_obj(b.as_bytes());
 
-        let a_path = String::from("./.test/") + a_hash.to_string().as_str();
-        let b_path = String::from("./.test/") + b_hash.to_string().as_str();
+        let a_path = String::from("./.tests/hash_writing_works") + a_hash.to_string().as_str();
 
         // write hashes of both strings
         if let Err(_) = write_hash(a.as_bytes(), &a_path, &String::from("blob")) {
             assert!(false, "failed to write a hash");
         }
-        if let Err(_) = write_hash(b.as_bytes(), &b_path, &String::from("blob")) {
-            assert!(false, "failed to write b hash");
+    }
+
+    #[test]
+    fn catfile_works() {
+        // write a hash first
+        if let Err(_) = fs::create_dir("./.tests/catfile_works") {
+            assert!(false, "failed to create test dir");
+        }
+        let a = String::from("new random string");
+
+        let a_hash = hash_obj(a.as_bytes());
+
+        let a_path = String::from("./.tests/catfile_works") + a_hash.to_string().as_str();
+
+        // write hashes of both strings
+        if let Err(_) = write_hash(a.as_bytes(), &a_path, &String::from("blob")) {
+            assert!(false, "failed to write a hash");
         }
 
-        fs::remove_dir_all("./.test").unwrap();
+        let a_res = cat_file(&a_hash.to_string(), &String::from("./.tests/catfile_works"));
+
+        if let Ok(a) = a_res {
+            let a_data_type = String::from_utf8(a[0].clone()).expect("fail data-type parse for a");
+            assert_eq!(a_data_type, String::from("blob"));
+
+            let a_file_data = a[1].clone();
+            assert_eq!(a_file_data, String::from("new random string").as_bytes());
+        } else {
+            assert!(false, "catfile a failed");
+        }
     }
 }
