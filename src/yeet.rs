@@ -14,6 +14,9 @@ pub struct Config {
     pub command: Options,
     pub args: Option<String>,
 }
+
+const SEPARATOR: u8 = 0x00u8;
+
 pub fn init_repo() -> Result<(), String> {
     let res = fs::create_dir("./.yeet");
     match res {
@@ -104,12 +107,16 @@ fn hash_obj(t: &[u8]) -> u64 {
     s.finish()
 }
 
-fn write_hash(data: &[u8], path: &String) -> Result<(), String> {
+fn write_hash(data: &[u8], path: &String, data_type: &String) -> Result<(), String> {
     let obj_file = File::create(path);
+
+    let data_header = data_type.as_bytes();
+
+    let buf = [data_header, &[SEPARATOR], data].concat();
     if let Err(_) = obj_file {
         return Err("Error creating file".to_string());
     }
-    if let Err(_) = obj_file.unwrap().write_all(data) {
+    if let Err(_) = obj_file.unwrap().write_all(&buf) {
         return Err("Error writing to file".to_string());
     }
     Ok(())
@@ -117,12 +124,22 @@ fn write_hash(data: &[u8], path: &String) -> Result<(), String> {
 
 pub fn cat_file(hash: &String) -> Result<(), String> {
     let path = String::from("./.yeet/objects/") + hash.as_str();
-    let file_data = fs::read_to_string(&path);
+    let file_bytes = fs::read(&path);
 
-    match file_data {
+    match file_bytes {
         Err(_) => Err(String::from("Error reading file at ") + path.as_str()),
         Ok(data) => {
-            println!("{}", data);
+            // split the bytes at the separator
+            let mut iter = data.split(|&x| x == SEPARATOR.into());
+            let data_type = iter.next().expect("Error reading file");
+            let file_data = iter.collect::<Vec<&[u8]>>().concat();
+
+            // data type will always be valid ascii;
+            println!(
+                "obj-type: {}",
+                String::from_utf8(data_type.to_vec()).unwrap()
+            );
+            println!("file-data: {:?}", file_data);
             Ok(())
         }
     }
@@ -137,7 +154,8 @@ pub fn hash_file(path: &String) -> Result<(), String> {
             let hash = hash_obj(&data);
             let hash_path = "./.yeet/objects/".to_string() + hash.to_string().as_str();
 
-            if let Err(e) = write_hash(&data, &hash_path) {
+            // TODO: check obj type
+            if let Err(e) = write_hash(&data, &hash_path, &String::from("blob")) {
                 return Err(e);
             } else {
                 return Ok(());
@@ -176,10 +194,10 @@ mod tests {
         let b_path = String::from("./.test/") + b_hash.to_string().as_str();
 
         // write hashes of both strings
-        if let Err(_) = write_hash(a.as_bytes(), &a_path) {
+        if let Err(_) = write_hash(a.as_bytes(), &a_path, &String::from("blob")) {
             assert!(false, "failed to write a hash");
         }
-        if let Err(_) = write_hash(b.as_bytes(), &b_path) {
+        if let Err(_) = write_hash(b.as_bytes(), &b_path, &String::from("blob")) {
             assert!(false, "failed to write b hash");
         }
 
