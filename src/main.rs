@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, process::exit};
 
 pub mod yeet;
 
@@ -7,7 +7,10 @@ fn main() {
     if let Some(config) = yeet::parse_args(&args) {
         match config.command {
             yeet::Options::Init => {
-                yeet::init_repo();
+                if let Err(e) = yeet::init_repo() {
+                    println!("{}", e);
+                    exit(1);
+                }
             }
             yeet::Options::CatFile => {
                 let file_path = config.args;

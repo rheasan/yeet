@@ -2,7 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::{env, fs, process::exit};
+use std::{env, fs};
 
 pub enum Options {
     Init,
@@ -14,12 +14,11 @@ pub struct Config {
     pub command: Options,
     pub args: Option<String>,
 }
-pub fn init_repo() {
+pub fn init_repo() -> Result<(), String> {
     let res = fs::create_dir("./.yeet");
     match res {
         Err(e) => {
-            println!("Error creating repo: {}", e);
-            exit(1);
+            return Err(String::from("Error creating directory: ") + e.to_string().as_str());
         }
         Ok(_) => {
             println!(
@@ -30,13 +29,11 @@ pub fn init_repo() {
     }
 
     let res = fs::create_dir("./.yeet/objects");
-    match res {
-        Err(e) => {
-            println!("Error creating dirs: {}", e);
-            exit(1);
-        }
-        Ok(_) => {}
+    if let Err(e) = res {
+        return Err(String::from("Error creating directory: ") + e.to_string().as_str());
     }
+
+    Ok(())
 }
 
 pub fn parse_args(args: &[String]) -> Option<Config> {
