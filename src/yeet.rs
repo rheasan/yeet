@@ -1,4 +1,4 @@
-use std::{env, fs};
+use std::{env, fs, path::PathBuf};
 
 use crate::data;
 
@@ -42,17 +42,17 @@ pub fn cat_file(hash: &String) {
     }
 }
 
-pub fn hash_file(path: &String) {
-    let res = data::save_hash(path);
+pub fn hash_file(path: PathBuf) {
+    let res = data::save_hash(&path);
     if let Err(e) = res {
         println!("Error: {}", e);
     }
 }
 
-pub fn write_tree(path: String) {
+pub fn write_tree(path: PathBuf) {
     let dir_entries = fs::read_dir(path.to_owned()).expect("Failed to read directory");
 
-    let ignore_path = path.to_owned() + "/.yeetignore";
+    let ignore_path = path.to_owned().join(".yeetignore");
     let mut ignore_entries: Vec<String> = vec![String::from(".yeet")];
 
     if fs::try_exists(ignore_path.to_owned()).expect("cant read files") {
@@ -75,8 +75,7 @@ pub fn write_tree(path: String) {
         let file_metadata = entry.metadata().expect("Failed to read metadata");
 
         if file_metadata.is_dir() {
-            let path = entry.path().clone();
-            write_tree(String::from(path.to_str().unwrap()));
+            write_tree(entry.path());
         } else {
             println!("{}", filename);
         }

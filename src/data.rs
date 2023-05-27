@@ -3,6 +3,7 @@ use std::fs;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
+use std::path::PathBuf;
 
 const SEPARATOR: u8 = 0x00u8;
 
@@ -12,7 +13,7 @@ fn hash_obj(t: &[u8]) -> u64 {
     s.finish()
 }
 
-fn write_data(data: &[u8], path: &String, data_type: &String) -> Result<(), String> {
+fn write_data(data: &[u8], path: &PathBuf, data_type: &String) -> Result<(), String> {
     let obj_file = File::create(path);
 
     let data_header = data_type.as_bytes();
@@ -30,13 +31,15 @@ fn write_data(data: &[u8], path: &String, data_type: &String) -> Result<(), Stri
 // TODO: find better way to do this
 // path == None for normal usage
 pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], String> {
-    let path = path_prefix.clone() + hash.as_str();
+    let path = PathBuf::from(path_prefix).join(hash);
     let file_bytes = fs::read(&path);
 
     match file_bytes {
-        Err(e) => {
-            Err(String::from("Error reading file at ") + path.as_str() + e.to_string().as_str())
-        }
+        Err(e) => Err(format!(
+            "Error reading file at: {:?}, {}",
+            path.as_os_str(),
+            e.to_string()
+        )),
         Ok(data) => {
             // split the bytes at the separator
             let mut iter = data.split(|&x| x == SEPARATOR.into());
@@ -49,15 +52,14 @@ pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], Stri
     }
 }
 
-pub fn save_hash(path: &String) -> Result<(), String> {
+pub fn save_hash(path: &PathBuf) -> Result<(), String> {
     let file_data = fs::read(path);
 
     match file_data {
-        Err(_) => Err(String::from("Error reading file at") + path.as_str()),
+        Err(_) => Err(format!("Error reading file at : {:?}", path.as_os_str())),
         Ok(data) => {
             let hash = hash_obj(&data);
-            let hash_path = "./.yeet/objects/".to_string() + hash.to_string().as_str();
-
+            let hash_path = PathBuf::from("./.yeet/objects/").join(hash.to_string());
             // TODO: check obj type
             if let Err(e) = write_data(&data, &hash_path, &String::from("blob")) {
                 return Err(e);
@@ -71,7 +73,7 @@ pub fn save_hash(path: &String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use crate::data::hash_obj;
-    use std::fs;
+    use std::{fs, path::PathBuf};
 
     use super::{get_data, write_data};
 
@@ -85,14 +87,14 @@ mod tests {
 
     #[test]
     fn hash_writing_works() {
-        if let Err(_) = fs::create_dir("./.tests/hash_writing_works") {
+        if let Err(_) = fs::create_dir("./tests/hash_writing_works") {
             assert!(false, "failed to create test dir");
         }
         let a = String::from("new random string");
 
         let a_hash = hash_obj(a.as_bytes());
 
-        let a_path = String::from("./.tests/hash_writing_works") + a_hash.to_string().as_str();
+        let a_path = PathBuf::from("./tests/hash_writing_works/").join(a_hash.to_string());
 
         // write hashes of both strings
         if let Err(_) = write_data(a.as_bytes(), &a_path, &String::from("blob")) {
@@ -103,21 +105,19 @@ mod tests {
     #[test]
     fn catfile_works() {
         // write a hash first
-        if let Err(_) = fs::create_dir("./.tests/catfile_works") {
+        if let Err(_) = fs::create_dir("./tests/catfile_works") {
             assert!(false, "failed to create test dir");
         }
         let a = String::from("new random string");
 
         let a_hash = hash_obj(a.as_bytes());
 
-        let a_path = String::from("./.tests/catfile_works") + a_hash.to_string().as_str();
+        let a_path = PathBuf::from("./tests/catfile_works/").join(a_hash.to_string());
 
         // write hashes of both strings
-        if let Err(_) = write_data(a.as_bytes(), &a_path, &String::from("blob")) {
-            assert!(false, "failed to write a hash");
-        }
+        write_data(a.as_bytes(), &a_path, &String::from("blob")).expect("Error writing hash");
 
-        let a_res = get_data(&a_hash.to_string(), String::from("./.tests/catfile_works"));
+        let a_res = get_data(&a_hash.to_string(), String::from("./tests/catfile_works"));
 
         if let Ok(a) = a_res {
             let a_data_type = String::from_utf8(a[0].clone()).expect("fail data-type parse for a");

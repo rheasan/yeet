@@ -1,4 +1,4 @@
 set -xe
-mkdir .tests
+mkdir tests
 cargo test
-rm -r .tests
+rm -r tests

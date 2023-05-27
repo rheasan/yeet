@@ -1,5 +1,5 @@
 #![feature(fs_try_exists)]
-use std::env;
+use std::{env, path::PathBuf};
 
 pub mod cli;
 pub mod data;
@@ -28,7 +28,7 @@ fn main() {
                 let file_path = config.args;
                 match file_path {
                     Some(path) => {
-                        yeet::hash_file(&path);
+                        yeet::hash_file(PathBuf::from(path));
                     }
                     None => {
                         unreachable!();
@@ -36,7 +36,7 @@ fn main() {
                 }
             }
             cli::Options::WriteTree => {
-                yeet::write_tree(String::from("."));
+                yeet::write_tree(PathBuf::from("."));
             }
         }
     }
