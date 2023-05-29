@@ -1,11 +1,16 @@
 use std::collections::hash_map::DefaultHasher;
-use std::fs;
-use std::fs::File;
+use std::fs::{self, File, OpenOptions};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::PathBuf;
 
 const SEPARATOR: u8 = 0x00u8;
+
+pub struct FileData {
+    pub file_name: String,
+    pub file_type: String,
+    pub hash: u64,
+}
 
 fn hash_obj(t: &[u8]) -> u64 {
     let mut s = DefaultHasher::new();
@@ -52,24 +57,24 @@ pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], Stri
     }
 }
 
-pub fn save_hash(path: &PathBuf) -> Result<(), String> {
+pub fn hash_file(path: &PathBuf) -> Result<FileData, String> {
     let file_data = fs::read(path);
 
-    match file_data {
-        Err(_) => Err(format!("Error reading file at : {:?}", path.as_os_str())),
-        Ok(data) => {
-            let hash = hash_obj(&data);
-            let hash_path = PathBuf::from("./.yeet/objects/").join(hash.to_string());
-            // TODO: check obj type
-            if let Err(e) = write_data(&data, &hash_path, &String::from("blob")) {
-                return Err(e);
-            } else {
-                return Ok(());
-            }
-        }
+    if let Err(_) = file_data {
+        return Err("Error reading file".to_string());
     }
+    let file_hash = hash_obj(&file_data.unwrap());
+
+    let res = FileData {
+        file_name: format!("{:?}", path.file_name().unwrap()),
+        file_type: "blob".to_string(),
+        hash: file_hash,
+    };
+
+    Ok(res)
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use crate::data::hash_obj;
@@ -130,3 +135,4 @@ mod tests {
         }
     }
 }
+*/

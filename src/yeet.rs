@@ -43,9 +43,17 @@ pub fn cat_file(hash: &String) {
 }
 
 pub fn hash_file(path: PathBuf) {
-    let res = data::save_hash(&path);
-    if let Err(e) = res {
-        println!("Error: {}", e);
+    let res = data::hash_file(&path);
+    match res {
+        Ok(file_data) => {
+            println!(
+                "{} {} {}",
+                file_data.file_type, file_data.hash, file_data.file_name
+            );
+        }
+        Err(e) => {
+            println!("{}", e);
+        }
     }
 }
 
