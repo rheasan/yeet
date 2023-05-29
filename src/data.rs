@@ -1,5 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::PathBuf;
@@ -12,66 +12,50 @@ pub struct FileData {
     pub hash: u64,
 }
 
-fn hash_obj(t: &[u8]) -> u64 {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
+pub fn hash_dir(data: &Vec<FileData>) -> u64 {
+    let strings = data
+        .iter()
+        .map(|x| {
+            return format!("{} {} {}", x.file_type, x.hash, x.file_name);
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    return write_obj_hash(strings.as_bytes(), "tree".to_string());
 }
 
-fn write_data(data: &[u8], path: &PathBuf, data_type: &String) -> Result<(), String> {
-    let obj_file = File::create(path);
+pub fn write_obj_hash(data: &[u8], type_: String) -> u64 {
+    let mut s = DefaultHasher::new();
+    data.hash(&mut s);
+    let hash = s.finish();
 
-    let data_header = data_type.as_bytes();
+    let buf = [type_.as_bytes(), &[SEPARATOR], data].concat();
 
-    let buf = [data_header, &[SEPARATOR], data].concat();
-    if let Err(_) = obj_file {
-        return Err("Error creating file".to_string());
-    }
-    if let Err(_) = obj_file.unwrap().write_all(&buf) {
-        return Err("Error writing to file".to_string());
-    }
-    Ok(())
+    let mut obj_file = File::create(PathBuf::from("./.yeet/objects").join(hash.to_string()))
+        .expect("Error creating file");
+
+    obj_file
+        .write_all(buf.as_slice())
+        .expect("Error writing to file");
+
+    return hash;
 }
 
 // TODO: find better way to do this
-// path == None for normal usage
 pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], String> {
-    let path = PathBuf::from(path_prefix).join(hash);
-    let file_bytes = fs::read(&path);
+    let file_path = PathBuf::from(path_prefix).join(hash);
 
-    match file_bytes {
-        Err(e) => Err(format!(
-            "Error reading file at: {:?}, {}",
-            path.as_os_str(),
-            e.to_string()
-        )),
-        Ok(data) => {
-            // split the bytes at the separator
-            let mut iter = data.split(|&x| x == SEPARATOR.into());
-            let data_type = iter.next().expect("Error reading file");
-            let file_data = iter.collect::<Vec<&[u8]>>().concat();
-            // data type will always be valid ascii;
-
-            return Ok([data_type.to_vec(), file_data]);
-        }
+    let file_bytes = fs::read(&file_path);
+    if let Err(_) = file_bytes {
+        return Err(format!("Error reading file at {:?}", file_path.as_os_str()));
     }
-}
 
-pub fn hash_file(path: &PathBuf) -> Result<FileData, String> {
-    let file_data = fs::read(path);
+    let file_bytes = file_bytes.unwrap();
+    let mut bytes = file_bytes.split(|&x| x == SEPARATOR);
+    let file_type = bytes.next().unwrap().to_vec();
+    let file_data = bytes.collect::<Vec<_>>().concat();
 
-    if let Err(_) = file_data {
-        return Err("Error reading file".to_string());
-    }
-    let file_hash = hash_obj(&file_data.unwrap());
-
-    let res = FileData {
-        file_name: format!("{:?}", path.file_name().unwrap()),
-        file_type: "blob".to_string(),
-        hash: file_hash,
-    };
-
-    Ok(res)
+    Ok([file_type, file_data])
 }
 
 /*

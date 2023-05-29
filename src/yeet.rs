@@ -1,6 +1,6 @@
 use std::{env, fs, path::PathBuf};
 
-use crate::data;
+use crate::data::{self, hash_dir, write_obj_hash, FileData};
 
 pub fn init_repo() {
     let res = fs::create_dir("./.yeet");
@@ -31,7 +31,7 @@ pub fn cat_file(hash: &String) {
             println!("obj-type: {}", String::from_utf8(data[0].clone()).unwrap());
             println!("file-data: {:?}", data[1]);
             if let Ok(file_data) = String::from_utf8(data[1].clone()) {
-                println!("ascii: {}", file_data);
+                println!("ascii:\n{}", file_data);
             } else {
                 println!("no ascii")
             }
@@ -42,23 +42,18 @@ pub fn cat_file(hash: &String) {
     }
 }
 
-pub fn hash_file(path: PathBuf) {
-    let res = data::hash_file(&path);
-    match res {
-        Ok(file_data) => {
-            println!(
-                "{} {} {}",
-                file_data.file_type, file_data.hash, file_data.file_name
-            );
-        }
-        Err(e) => {
-            println!("{}", e);
-        }
-    }
+pub fn hash_file(path: PathBuf) -> u64 {
+    let file_data = fs::read(&path).expect("Error reading file");
+    // println!("{:?}", file_data);
+    let hash = write_obj_hash(&file_data, "blob".to_string());
+
+    println!("blob {} {:?}", hash, path.file_name().unwrap());
+    return hash;
 }
 
-pub fn write_tree(path: PathBuf) {
+pub fn write_tree(path: PathBuf) -> u64 {
     let dir_entries = fs::read_dir(path.to_owned()).expect("Failed to read directory");
+    let mut cur_dir_data: Vec<FileData> = vec![];
 
     let ignore_path = path.to_owned().join(".yeetignore");
     let mut ignore_entries: Vec<String> = vec![String::from(".yeet")];
@@ -83,9 +78,25 @@ pub fn write_tree(path: PathBuf) {
         let file_metadata = entry.metadata().expect("Failed to read metadata");
 
         if file_metadata.is_dir() {
-            write_tree(entry.path());
+            let hash = write_tree(entry.path());
+            println!("dir: {}", filename);
+            let d = FileData {
+                file_name: filename,
+                file_type: "tree".to_string(),
+                hash,
+            };
+            cur_dir_data.push(d);
         } else {
-            println!("{}", filename);
+            let hash = hash_file(entry.path());
+            println!("file: {}", filename);
+            let d = FileData {
+                file_name: filename,
+                file_type: "blob".to_string(),
+                hash,
+            };
+            cur_dir_data.push(d);
         }
     }
+
+    return hash_dir(&cur_dir_data);
 }
