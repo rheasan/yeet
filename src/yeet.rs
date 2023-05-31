@@ -1,6 +1,6 @@
 use std::{env, fs, path::PathBuf};
 
-use crate::data::{self, hash_dir, write_obj_hash, FileData};
+use crate::data::{self, hash_dir, write_obj_hash, DirType, FileData};
 
 pub fn init_repo() {
     let res = fs::create_dir("./.yeet");
@@ -99,4 +99,15 @@ pub fn write_tree(path: PathBuf) -> u64 {
     }
 
     return hash_dir(&cur_dir_data);
+}
+
+pub fn read_tree(hash: String, write_dir: PathBuf) {
+    if !fs::try_exists(write_dir.to_owned()).expect("Unable to read dir") {
+        fs::create_dir_all(write_dir.to_owned()).expect("Unable to make dir");
+    }
+
+    let write_dir_name = format!("{:?}", write_dir.as_os_str());
+
+    let root_dir = data::gen_tree(hash, write_dir_name, write_dir);
+    data::write_entry(root_dir);
 }

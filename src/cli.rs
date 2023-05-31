@@ -3,6 +3,7 @@ pub enum Options {
     CatFile,
     HashFile,
     WriteTree,
+    ReadTree,
 }
 
 pub struct Config {
@@ -69,6 +70,21 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
             return Some(Config {
                 command: Options::WriteTree,
                 args: None,
+            });
+        }
+    } else if args[1] == "readtree" {
+        if args.len() > 3 {
+            println!("Too many arguments");
+            print_help();
+            return None;
+        } else if args.len() != 3 {
+            println!("No file name provided");
+            print_help();
+            return None;
+        } else {
+            return Some(Config {
+                command: Options::ReadTree,
+                args: Some(args[2].clone()),
             });
         }
     }

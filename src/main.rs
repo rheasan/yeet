@@ -38,6 +38,10 @@ fn main() {
             cli::Options::WriteTree => {
                 yeet::write_tree(PathBuf::from("."));
             }
+            cli::Options::ReadTree => {
+                let hash = config.args.unwrap();
+                yeet::read_tree(hash, PathBuf::from("./restored"));
+            }
         }
     }
 }
