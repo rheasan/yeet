@@ -42,12 +42,14 @@ pub fn cat_file(hash: &String) {
     }
 }
 
-pub fn hash_file(path: PathBuf) -> u64 {
+pub fn hash_file(path: PathBuf, show_out: bool) -> u64 {
     let file_data = fs::read(&path).expect("Error reading file");
     // println!("{:?}", file_data);
     let hash = write_obj_hash(&file_data, "blob".to_string());
 
-    println!("blob {} {:?}", hash, path.file_name().unwrap());
+    if show_out {
+        println!("blob {} {:?}", hash, path.file_name().unwrap());
+    }
     return hash;
 }
 
@@ -79,7 +81,6 @@ pub fn write_tree(path: PathBuf) -> u64 {
 
         if file_metadata.is_dir() {
             let hash = write_tree(entry.path());
-            println!("dir: {}", filename);
             let d = FileData {
                 file_name: filename,
                 file_type: "tree".to_string(),
@@ -87,8 +88,7 @@ pub fn write_tree(path: PathBuf) -> u64 {
             };
             cur_dir_data.push(d);
         } else {
-            let hash = hash_file(entry.path());
-            println!("file: {}", filename);
+            let hash = hash_file(entry.path(), false);
             let d = FileData {
                 file_name: filename,
                 file_type: "blob".to_string(),

@@ -28,7 +28,7 @@ fn main() {
                 let file_path = config.args;
                 match file_path {
                     Some(path) => {
-                        yeet::hash_file(PathBuf::from(path));
+                        yeet::hash_file(PathBuf::from(path), true);
                     }
                     None => {
                         unreachable!();
@@ -36,7 +36,8 @@ fn main() {
                 }
             }
             cli::Options::WriteTree => {
-                yeet::write_tree(PathBuf::from("."));
+                let rev_id = yeet::write_tree(PathBuf::from("."));
+                println!("New revision id: {}", rev_id);
             }
             cli::Options::ReadTree => {
                 let hash = config.args.unwrap();
