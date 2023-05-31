@@ -4,6 +4,7 @@ pub enum Options {
     HashFile,
     WriteTree,
     ReadTree,
+    SetAuthor,
 }
 
 pub struct Config {
@@ -84,6 +85,21 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::ReadTree,
+                args: Some(args[2].clone()),
+            });
+        }
+    } else if args[1] == "setauthor" {
+        if args.len() > 3 {
+            println!("Too many arguments");
+            print_help();
+            return None;
+        } else if args.len() != 3 {
+            println!("No name provided");
+            print_help();
+            return None;
+        } else {
+            return Some(Config {
+                command: Options::SetAuthor,
                 args: Some(args[2].clone()),
             });
         }

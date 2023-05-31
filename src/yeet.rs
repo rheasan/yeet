@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, io::Write, path::PathBuf};
 
 use crate::data::{self, hash_dir, write_obj_hash, DirType, FileData};
 
@@ -18,6 +18,10 @@ pub fn init_repo() {
     }
 
     let res = fs::create_dir("./.yeet/objects");
+    if let Err(e) = res {
+        println!("Error creating directory: {}", e.to_string());
+    }
+    let res = fs::create_dir("./.yeet/repo_data");
     if let Err(e) = res {
         println!("Error creating directory: {}", e.to_string());
     }
@@ -112,4 +116,13 @@ pub fn read_tree(hash: String, write_dir: PathBuf) {
 
     let root_dir = data::gen_tree(hash, write_dir_name, write_dir);
     data::write_entry(root_dir);
+}
+
+pub fn set_author(name: String) {
+    let mut auth_file =
+        fs::File::create(PathBuf::from("./.yeet/repo_data/author")).expect("Unable to find data");
+    auth_file
+        .write(name.as_bytes())
+        .expect("Unable to set auth name: ");
+    println!("Set author name to {}", name);
 }

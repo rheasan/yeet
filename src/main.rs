@@ -43,6 +43,10 @@ fn main() {
                 let hash = config.args.unwrap();
                 yeet::read_tree(hash, PathBuf::from("./restored"));
             }
+            cli::Options::SetAuthor => {
+                let name = config.args.unwrap();
+                yeet::set_author(name);
+            }
         }
     }
 }
