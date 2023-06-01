@@ -6,9 +6,10 @@ use std::path::PathBuf;
 
 const SEPARATOR: u8 = 0x00u8;
 #[derive(Debug, PartialEq)]
-pub enum DirType {
+pub enum ObjType {
     Blob,
     Tree,
+    Commit,
 }
 
 pub struct FileData {
@@ -19,7 +20,7 @@ pub struct FileData {
 
 pub struct DirEntry {
     pub name: String,
-    pub type_: DirType,
+    pub type_: ObjType,
     pub hash: String,
     pub path: PathBuf,
     pub children: Option<Vec<DirEntry>>,
@@ -28,7 +29,7 @@ pub struct DirEntry {
 impl DirEntry {
     fn new(
         name: String,
-        type_: DirType,
+        type_: ObjType,
         hash: String,
         path: PathBuf,
         children: Option<Vec<DirEntry>>,
@@ -126,7 +127,7 @@ fn decode_dir_data(hash: &String) -> Vec<FileData> {
 pub fn gen_tree(hash: String, name: String, path: PathBuf) -> DirEntry {
     let dir_data = decode_dir_data(&hash);
     if dir_data.is_empty() {
-        return DirEntry::new(name, DirType::Tree, hash, path, None);
+        return DirEntry::new(name, ObjType::Tree, hash, path, None);
     }
 
     let children = dir_data
@@ -141,7 +142,7 @@ pub fn gen_tree(hash: String, name: String, path: PathBuf) -> DirEntry {
             } else {
                 return DirEntry::new(
                     x.file_name.clone(),
-                    DirType::Blob,
+                    ObjType::Blob,
                     x.hash.to_string(),
                     path.join(x.file_name.clone()),
                     None,
@@ -150,7 +151,7 @@ pub fn gen_tree(hash: String, name: String, path: PathBuf) -> DirEntry {
         })
         .collect::<Vec<DirEntry>>();
 
-    return DirEntry::new(name, DirType::Tree, hash, path, Some(children));
+    return DirEntry::new(name, ObjType::Tree, hash, path, Some(children));
 }
 
 pub fn show_tree(entry: &DirEntry, count: usize) {
@@ -167,7 +168,7 @@ pub fn show_tree(entry: &DirEntry, count: usize) {
 }
 
 pub fn write_entry(entry: DirEntry) {
-    if entry.type_ == DirType::Blob {
+    if entry.type_ == ObjType::Blob {
         let [_, file_data] = get_data(&entry.hash, String::from("./.yeet/objects/")).unwrap();
         let mut file = fs::File::create(entry.path).unwrap();
         file.write_all(file_data.as_slice()).unwrap();

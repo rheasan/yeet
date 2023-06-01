@@ -1,6 +1,8 @@
 use std::{env, fs, io::Write, path::PathBuf};
 
-use crate::data::{self, hash_dir, write_obj_hash, DirType, FileData};
+use time::OffsetDateTime;
+
+use crate::data::{self, hash_dir, write_obj_hash, FileData};
 
 pub fn init_repo() {
     let res = fs::create_dir("./.yeet");
@@ -125,4 +127,24 @@ pub fn set_author(name: String) {
         .write(name.as_bytes())
         .expect("Unable to set auth name: ");
     println!("Set author name to {}", name);
+}
+
+pub fn commit(message: String) {
+    let author = fs::read_to_string(PathBuf::from("./.yeet/repo_data/author"))
+        .expect("Unable to read author name");
+    let time = OffsetDateTime::now_utc();
+
+    let id = write_tree(PathBuf::from("."));
+    let commit_data = format!(
+        "tree {}\nauthor {}\ntime {:?}\n{}",
+        id, author, time, message
+    );
+    let commit_id = data::write_obj_hash(commit_data.as_bytes(), "commit".to_string());
+
+    let mut head = fs::File::create(PathBuf::from("./.yeet/HEAD")).expect("Unable to write HEAD");
+    head.write(commit_id.to_le_bytes().as_slice())
+        .expect("Unable to write head");
+
+    println!("commit id: {}", commit_id);
+    println!("{}", message);
 }

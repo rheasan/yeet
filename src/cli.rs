@@ -5,6 +5,7 @@ pub enum Options {
     WriteTree,
     ReadTree,
     SetAuthor,
+    Commit,
 }
 
 pub struct Config {
@@ -100,6 +101,21 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::SetAuthor,
+                args: Some(args[2].clone()),
+            });
+        }
+    } else if args[1] == "commit" {
+        if args.len() > 3 {
+            println!("Too many arguments");
+            print_help();
+            return None;
+        } else if args.len() != 3 {
+            println!("No commit message provided");
+            print_help();
+            return None;
+        } else {
+            return Some(Config {
+                command: Options::Commit,
                 args: Some(args[2].clone()),
             });
         }

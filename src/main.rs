@@ -47,6 +47,10 @@ fn main() {
                 let name = config.args.unwrap();
                 yeet::set_author(name);
             }
+            cli::Options::Commit => {
+                let message = config.args.unwrap();
+                yeet::commit(message);
+            }
         }
     }
 }
