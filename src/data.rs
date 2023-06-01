@@ -181,3 +181,29 @@ pub fn write_entry(entry: DirEntry) {
         }
     }
 }
+
+pub fn read_commit(hash: String) {
+    let [type_, data] = get_data(&hash, "./.yeet/objects".to_string()).unwrap();
+    if String::from_utf8(type_).unwrap() != "commit" {
+        panic!("Invalid commit found {}", hash);
+    }
+    let strings = String::from_utf8(data).unwrap();
+    let mut data = strings.split("\n").map(|x| x.to_string());
+
+    // TODO: fix this iter monster
+    let _ = data.next().unwrap().split_once(" ").unwrap().1.to_string();
+    let parent_hash = data.next().unwrap().split_once(" ").unwrap().1.to_string();
+    let author_name = data.next().unwrap().split_once(" ").unwrap().1.to_string();
+    let time = data.next().unwrap().split_once(" ").unwrap().1.to_string();
+    let message = data.collect::<Vec<_>>().concat();
+
+    println!("commit {}", hash);
+    println!("Author: {}", author_name);
+    println!("Date: {}", time);
+    println!("{}", message);
+
+    if parent_hash != "initial" {
+        print!("\n");
+        read_commit(parent_hash);
+    }
+}

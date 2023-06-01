@@ -6,6 +6,7 @@ pub enum Options {
     ReadTree,
     SetAuthor,
     Commit,
+    Log,
 }
 
 pub struct Config {
@@ -116,6 +117,22 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::Commit,
+                args: Some(args[2].clone()),
+            });
+        }
+    } else if args[1] == "log" {
+        if args.len() > 3 {
+            println!("Too many arguments");
+            print_help();
+            return None;
+        } else if args.len() == 2 {
+            return Some(Config {
+                command: Options::Log,
+                args: None,
+            });
+        } else {
+            return Some(Config {
+                command: Options::Log,
                 args: Some(args[2].clone()),
             });
         }

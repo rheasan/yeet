@@ -2,7 +2,7 @@ use std::{env, fs, io::Write, path::PathBuf};
 
 use time::OffsetDateTime;
 
-use crate::data::{self, hash_dir, write_obj_hash, FileData};
+use crate::data::{self, hash_dir, read_commit, write_obj_hash, FileData};
 
 pub fn init_repo() {
     let res = fs::create_dir("./.yeet");
@@ -130,8 +130,10 @@ pub fn commit(message: String) {
     let author = fs::read_to_string(PathBuf::from("./.yeet/repo_data/author"))
         .expect("Unable to read author name");
     let time = OffsetDateTime::now_utc();
-    let parent = fs::read_to_string(PathBuf::from("./.yeet/HEAD")).unwrap();
-
+    let mut parent = fs::read_to_string(PathBuf::from("./.yeet/HEAD")).unwrap();
+    if parent == "" {
+        parent = "initial".to_string();
+    }
     let id = write_tree(PathBuf::from("."));
     let commit_data = format!(
         "tree {}\nparent {}\nauthor {}\ntime {:?}\n{}",
@@ -145,4 +147,17 @@ pub fn commit(message: String) {
 
     println!("commit id: {}", commit_id);
     println!("{}", message);
+}
+
+pub fn log(commit_id: Option<String>) {
+    let hash: String;
+    match commit_id {
+        Some(a) => {
+            hash = a;
+        }
+        None => {
+            hash = fs::read_to_string(PathBuf::from("./.yeet/HEAD")).unwrap();
+        }
+    }
+    read_commit(hash);
 }

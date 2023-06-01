@@ -51,6 +51,10 @@ fn main() {
                 let message = config.args.unwrap();
                 yeet::commit(message);
             }
+            cli::Options::Log => {
+                let hash = config.args;
+                yeet::log(hash);
+            }
         }
     }
 }
