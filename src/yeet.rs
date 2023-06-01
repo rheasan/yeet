@@ -19,14 +19,11 @@ pub fn init_repo() {
         }
     }
 
-    let res = fs::create_dir("./.yeet/objects");
-    if let Err(e) = res {
-        println!("Error creating directory: {}", e.to_string());
-    }
-    let res = fs::create_dir("./.yeet/repo_data");
-    if let Err(e) = res {
-        println!("Error creating directory: {}", e.to_string());
-    }
+    fs::create_dir("./.yeet/objects").expect("Error creating objects");
+
+    fs::create_dir("./.yeet/repo_data").expect("Error creating repo_data");
+
+    fs::File::create("./.yeet/HEAD").expect("Error creating HEAD");
 }
 
 pub fn cat_file(hash: &String) {
@@ -133,16 +130,17 @@ pub fn commit(message: String) {
     let author = fs::read_to_string(PathBuf::from("./.yeet/repo_data/author"))
         .expect("Unable to read author name");
     let time = OffsetDateTime::now_utc();
+    let parent = fs::read_to_string(PathBuf::from("./.yeet/HEAD")).unwrap();
 
     let id = write_tree(PathBuf::from("."));
     let commit_data = format!(
-        "tree {}\nauthor {}\ntime {:?}\n{}",
-        id, author, time, message
+        "tree {}\nparent {}\nauthor {}\ntime {:?}\n{}",
+        id, parent, author, time, message
     );
     let commit_id = data::write_obj_hash(commit_data.as_bytes(), "commit".to_string());
 
     let mut head = fs::File::create(PathBuf::from("./.yeet/HEAD")).expect("Unable to write HEAD");
-    head.write(commit_id.to_le_bytes().as_slice())
+    head.write(commit_id.to_string().as_bytes())
         .expect("Unable to write head");
 
     println!("commit id: {}", commit_id);
