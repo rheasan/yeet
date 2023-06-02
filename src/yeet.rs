@@ -105,7 +105,7 @@ pub fn write_tree(path: PathBuf) -> u64 {
 }
 
 pub fn read_tree(hash: String, write_dir: PathBuf) {
-    if !fs::try_exists(write_dir.to_owned()).expect("Unable to read dir") {
+    if fs::try_exists(write_dir.to_owned()).expect("Unable to read dir") {
         fs::remove_dir_all(write_dir.to_owned()).expect("Unable to remove previous revision");
     }
 
