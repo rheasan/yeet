@@ -8,13 +8,14 @@ pub enum Options {
     Commit,
     Log,
     Checkout,
+    Tag,
 }
 
 pub struct Config {
     pub command: Options,
-    pub args: Option<String>,
+    pub args: Option<Vec<String>>,
 }
-pub fn parse_args(args: &[String]) -> Option<Config> {
+pub fn parse_args(args: &Vec<String>) -> Option<Config> {
     // No arguments given
     if args.len() == 1 {
         println!("No args provided");
@@ -47,7 +48,7 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::CatFile,
-                args: Some(args[2].clone()),
+                args: Some(args.get(2..).unwrap().to_vec()),
             });
         }
     } else if args[1] == "hashfile" {
@@ -62,7 +63,7 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::HashFile,
-                args: Some(args[2].clone()),
+                args: Some(args.get(2..).unwrap().to_vec()),
             });
         }
     } else if args[1] == "writetree" {
@@ -88,7 +89,7 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::ReadTree,
-                args: Some(args[2].clone()),
+                args: Some(args.get(2..).unwrap().to_vec()),
             });
         }
     } else if args[1] == "setauthor" {
@@ -103,7 +104,7 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::SetAuthor,
-                args: Some(args[2].clone()),
+                args: Some(args.get(2..).unwrap().to_vec()),
             });
         }
     } else if args[1] == "commit" {
@@ -118,7 +119,7 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::Commit,
-                args: Some(args[2].clone()),
+                args: Some(args.get(2..).unwrap().to_vec()),
             });
         }
     } else if args[1] == "log" {
@@ -131,10 +132,10 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
                 command: Options::Log,
                 args: None,
             });
-        } else {
+        } else if args.len() == 3 {
             return Some(Config {
                 command: Options::Log,
-                args: Some(args[2].clone()),
+                args: Some(vec![args[2].clone()]),
             });
         }
     } else if args[1] == "checkout" {
@@ -149,7 +150,22 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::Checkout,
-                args: Some(args[2].clone()),
+                args: Some(args.get(2..).unwrap().to_vec()),
+            });
+        }
+    } else if args[1] == "tag" {
+        if args.len() > 4 {
+            println!("Too many arguments");
+            print_help();
+            return None;
+        } else if args.len() != 4 {
+            println!("No commit id provided");
+            print_help();
+            return None;
+        } else {
+            return Some(Config {
+                command: Options::Tag,
+                args: Some(args.get(2..).unwrap().to_vec()),
             });
         }
     }

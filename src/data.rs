@@ -125,9 +125,10 @@ fn decode_dir_data(hash: &String) -> Vec<FileData> {
 }
 
 pub fn gen_tree(hash: String, name: String, path: PathBuf) -> DirEntry {
-    let dir_data = decode_dir_data(&hash);
+    let actual_hash = get_actual_hash(&hash);
+    let dir_data = decode_dir_data(&actual_hash);
     if dir_data.is_empty() {
-        return DirEntry::new(name, ObjType::Tree, hash, path, None);
+        return DirEntry::new(name, ObjType::Tree, actual_hash, path, None);
     }
 
     let children = dir_data
@@ -151,7 +152,7 @@ pub fn gen_tree(hash: String, name: String, path: PathBuf) -> DirEntry {
         })
         .collect::<Vec<DirEntry>>();
 
-    return DirEntry::new(name, ObjType::Tree, hash, path, Some(children));
+    return DirEntry::new(name, ObjType::Tree, actual_hash, path, Some(children));
 }
 
 pub fn show_tree(entry: &DirEntry, count: usize) {
@@ -183,9 +184,11 @@ pub fn write_entry(entry: DirEntry) {
 }
 
 pub fn read_commit(hash: String) {
-    let [type_, data] = get_data(&hash, "./.yeet/objects".to_string()).unwrap();
+    let actual_hash = get_actual_hash(&hash);
+
+    let [type_, data] = get_data(&actual_hash, "./.yeet/objects".to_string()).unwrap();
     if String::from_utf8(type_).unwrap() != "commit" {
-        panic!("Invalid commit found {}", hash);
+        panic!("Invalid commit or tag found {}", actual_hash);
     }
     let strings = String::from_utf8(data).unwrap();
     let mut data = strings.split("\n").map(|x| x.to_string());
@@ -197,7 +200,7 @@ pub fn read_commit(hash: String) {
     let time = data.next().unwrap().split_once(" ").unwrap().1.to_string();
     let message = data.collect::<Vec<_>>().concat();
 
-    println!("commit {}", hash);
+    println!("commit {}", actual_hash);
     println!("Author: {}", author_name);
     println!("Date: {}", time);
     println!("{}", message);
@@ -209,9 +212,10 @@ pub fn read_commit(hash: String) {
 }
 
 pub fn get_commit_tree(hash: &String) -> String {
-    let [type_, data] = get_data(&hash, "./.yeet/objects".to_string()).unwrap();
+    let actual_hash = get_actual_hash(hash);
+    let [type_, data] = get_data(&actual_hash, "./.yeet/objects".to_string()).unwrap();
     if String::from_utf8(type_).unwrap() != "commit" {
-        panic!("Invalid commit hash {}", hash);
+        panic!("Invalid commit hash or tag {}", hash);
     }
     let strings = String::from_utf8(data).unwrap();
     let mut commit_data = strings.split("\n").map(|x| x.to_string());
@@ -223,4 +227,43 @@ pub fn get_commit_tree(hash: &String) -> String {
         .1
         .to_string();
     return tree_hash;
+}
+
+pub fn get_tag(tag: &String) -> Result<String, String> {
+    let id = fs::read_to_string(PathBuf::from("./.yeet/tags").join(&tag));
+
+    match id {
+        Ok(tag) => return Ok(tag),
+        Err(e) => return Err(format!("Error reading tag {} : {}", tag, e.to_string())),
+    }
+}
+
+pub fn set_tag(tag: String, hash: String) -> Result<(), String> {
+    if let Ok(_) = tag.parse::<u64>() {
+        return Err(format!("Cannot use integer as tag name: {}", tag));
+    }
+
+    let [type_, _] = get_data(&hash, "./.yeet/objects".to_string())?;
+    if String::from_utf8(type_).unwrap() != "commit" {
+        return Err(format!("Invalid commit hash {}", hash));
+    }
+    let tag_file = fs::File::create(PathBuf::from("./.yeet/tags").join(&tag));
+    if let Err(e) = tag_file {
+        return Err(format!("Failed to set tag {}: {}", tag, e.to_string()));
+    }
+
+    let res = tag_file.unwrap().write(hash.as_bytes());
+    if let Err(e) = res {
+        return Err(format!("Failed to set tag {}: {}", tag, e.to_string()));
+    }
+
+    Ok(())
+}
+
+fn get_actual_hash(hash: &String) -> String {
+    if let Err(_) = hash.parse::<u64>() {
+        return get_tag(&hash).unwrap();
+    } else {
+        return hash.clone();
+    }
 }

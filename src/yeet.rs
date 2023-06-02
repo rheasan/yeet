@@ -23,7 +23,9 @@ pub fn init_repo() {
 
     fs::create_dir("./.yeet/repo_data").expect("Error creating repo_data");
 
-    fs::File::create("./.yeet/HEAD").expect("Error creating HEAD");
+    fs::create_dir("./.yeet/tags").expect("Error creating tags");
+
+    fs::File::create("./.yeet/tags/HEAD").expect("Error setting head");
 }
 
 pub fn cat_file(hash: &String) {
@@ -129,7 +131,7 @@ pub fn commit(message: String) {
     let author = fs::read_to_string(PathBuf::from("./.yeet/repo_data/author"))
         .expect("Unable to read author name");
     let time = OffsetDateTime::now_utc();
-    let mut parent = fs::read_to_string(PathBuf::from("./.yeet/HEAD")).unwrap();
+    let mut parent = data::get_tag(&"HEAD".to_string()).unwrap();
     if parent == "" {
         parent = "initial".to_string();
     }
@@ -140,10 +142,7 @@ pub fn commit(message: String) {
     );
     let commit_id = data::write_obj_hash(commit_data.as_bytes(), "commit".to_string());
 
-    let mut head = fs::File::create(PathBuf::from("./.yeet/HEAD")).expect("Unable to write HEAD");
-    head.write(commit_id.to_string().as_bytes())
-        .expect("Unable to write head");
-
+    data::set_tag("HEAD".to_string(), commit_id.to_string()).unwrap();
     println!("commit id: {}", commit_id);
     println!("{}", message);
 }
@@ -155,7 +154,7 @@ pub fn log(commit_id: Option<String>) {
             hash = a;
         }
         None => {
-            hash = fs::read_to_string(PathBuf::from("./.yeet/HEAD")).unwrap();
+            hash = data::get_tag(&"HEAD".to_string()).unwrap();
         }
     }
     read_commit(hash);
@@ -163,8 +162,14 @@ pub fn log(commit_id: Option<String>) {
 
 pub fn checkout(commit_id: String) {
     let tree_hash = data::get_commit_tree(&commit_id);
-    let mut head = fs::File::create(PathBuf::from("./.yeet/HEAD")).expect("Unable to write HEAD");
-    head.write(commit_id.as_bytes())
-        .expect("Unable to write head");
+    data::set_tag("HEAD".to_string(), commit_id).unwrap();
     read_tree(tree_hash, PathBuf::from("./restored"));
+}
+
+pub fn tag_commit(tag: String, hash: String) {
+    println!("tag {} hash {}", tag, hash);
+    let res = data::set_tag(tag, hash);
+    if let Err(e) = res {
+        println!("{}", e);
+    }
 }
