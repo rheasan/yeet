@@ -207,3 +207,20 @@ pub fn read_commit(hash: String) {
         read_commit(parent_hash);
     }
 }
+
+pub fn get_commit_tree(hash: &String) -> String {
+    let [type_, data] = get_data(&hash, "./.yeet/objects".to_string()).unwrap();
+    if String::from_utf8(type_).unwrap() != "commit" {
+        panic!("Invalid commit hash {}", hash);
+    }
+    let strings = String::from_utf8(data).unwrap();
+    let mut commit_data = strings.split("\n").map(|x| x.to_string());
+    let tree_hash = commit_data
+        .next()
+        .unwrap()
+        .split_once(" ")
+        .unwrap()
+        .1
+        .to_string();
+    return tree_hash;
+}

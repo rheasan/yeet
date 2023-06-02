@@ -7,6 +7,7 @@ pub enum Options {
     SetAuthor,
     Commit,
     Log,
+    Checkout,
 }
 
 pub struct Config {
@@ -133,6 +134,21 @@ pub fn parse_args(args: &[String]) -> Option<Config> {
         } else {
             return Some(Config {
                 command: Options::Log,
+                args: Some(args[2].clone()),
+            });
+        }
+    } else if args[1] == "checkout" {
+        if args.len() > 3 {
+            println!("Too many arguments");
+            print_help();
+            return None;
+        } else if args.len() != 3 {
+            println!("No commit id provided");
+            print_help();
+            return None;
+        } else {
+            return Some(Config {
+                command: Options::Checkout,
                 args: Some(args[2].clone()),
             });
         }

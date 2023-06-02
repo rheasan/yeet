@@ -161,3 +161,11 @@ pub fn log(commit_id: Option<String>) {
     }
     read_commit(hash);
 }
+
+pub fn checkout(commit_id: String) {
+    let tree_hash = data::get_commit_tree(&commit_id);
+    let mut head = fs::File::create(PathBuf::from("./.yeet/HEAD")).expect("Unable to write HEAD");
+    head.write(commit_id.as_bytes())
+        .expect("Unable to write head");
+    read_tree(tree_hash, PathBuf::from("./restored"));
+}

@@ -55,6 +55,10 @@ fn main() {
                 let hash = config.args;
                 yeet::log(hash);
             }
+            cli::Options::Checkout => {
+                let hash = config.args.unwrap();
+                yeet::checkout(hash);
+            }
         }
     }
 }
