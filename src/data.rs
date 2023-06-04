@@ -1,6 +1,8 @@
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
+use std::io::Error as IOError;
+use std::io::ErrorKind as IOErrorKind;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -44,7 +46,7 @@ impl DirEntry {
     }
 }
 
-pub fn hash_dir(data: &Vec<FileData>) -> u64 {
+pub fn hash_dir(data: &Vec<FileData>) -> Result<u64, IOError> {
     let strings = data
         .iter()
         .map(|x| {
@@ -56,33 +58,26 @@ pub fn hash_dir(data: &Vec<FileData>) -> u64 {
     return write_obj_hash(strings.as_bytes(), "tree".to_string());
 }
 
-pub fn write_obj_hash(data: &[u8], type_: String) -> u64 {
+pub fn write_obj_hash(data: &[u8], type_: String) -> Result<u64, IOError> {
     let mut s = DefaultHasher::new();
     data.hash(&mut s);
     let hash = s.finish();
 
     let buf = [type_.as_bytes(), &[SEPARATOR], data].concat();
 
-    let mut obj_file = File::create(PathBuf::from("./.yeet/objects").join(hash.to_string()))
-        .expect("Error creating file");
+    let mut obj_file = File::create(PathBuf::from("./.yeet/objects").join(hash.to_string()))?;
 
-    obj_file
-        .write_all(buf.as_slice())
-        .expect("Error writing to file");
+    obj_file.write_all(buf.as_slice())?;
 
-    return hash;
+    return Ok(hash);
 }
 
 // TODO: find better way to do this
-pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], String> {
+pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], IOError> {
     let file_path = PathBuf::from(path_prefix).join(hash);
 
-    let file_bytes = fs::read(&file_path);
-    if let Err(_) = file_bytes {
-        return Err(format!("Error reading file at {:?}", file_path.as_os_str()));
-    }
+    let file_bytes = fs::read(&file_path)?;
 
-    let file_bytes = file_bytes.unwrap();
     let mut bytes = file_bytes.split(|&x| x == SEPARATOR);
     let file_type = bytes.next().unwrap().to_vec();
     let file_data = bytes.collect::<Vec<_>>().concat();
@@ -90,8 +85,8 @@ pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], Stri
     Ok([file_type, file_data])
 }
 
-fn decode_dir_data(hash: &String) -> Vec<FileData> {
-    let [_, data] = get_data(hash, "./.yeet/objects".to_string()).unwrap();
+fn decode_dir_data(hash: &String) -> Result<Vec<FileData>, IOError> {
+    let [_, data] = get_data(hash, "./.yeet/objects".to_string())?;
     let strings = String::from_utf8(data.to_vec()).unwrap();
     let mut data: Vec<FileData> = Vec::new();
     for string in strings.split("\n") {
@@ -101,16 +96,22 @@ fn decode_dir_data(hash: &String) -> Vec<FileData> {
             .collect::<Vec<String>>();
 
         if d.len() != 3 {
-            panic!("expected 3 values got {}", d.len());
+            return Err(IOError::new(
+                IOErrorKind::InvalidData,
+                format!("expected 3 values got {}", d.len()),
+            ));
         } else {
             let file_type = d[0].clone();
             let hash = d[1].parse::<u64>().unwrap();
             let file_name = d[2].clone();
             if file_type.eq_ignore_ascii_case("tree") && file_type.eq_ignore_ascii_case("blob") {
-                panic!(
-                    "Incorrect type found: {}. Expected 'tree' or 'blob', {:?}",
-                    file_type, d
-                );
+                return Err(IOError::new(
+                    IOErrorKind::InvalidData,
+                    format!(
+                        "Incorrect type found: {}. Expected 'tree' or 'blob', {:?}",
+                        file_type, d
+                    ),
+                ));
             }
 
             let file_d = FileData {
@@ -121,25 +122,26 @@ fn decode_dir_data(hash: &String) -> Vec<FileData> {
             data.push(file_d);
         }
     }
-    return data;
+    return Ok(data);
 }
 
-pub fn gen_tree(hash: String, name: String, path: PathBuf) -> DirEntry {
-    let actual_hash = get_actual_hash(&hash);
-    let dir_data = decode_dir_data(&actual_hash);
+pub fn gen_tree(hash: String, name: String, path: PathBuf) -> Result<DirEntry, IOError> {
+    let actual_hash = get_actual_hash(&hash)?;
+    let dir_data = decode_dir_data(&actual_hash)?;
     if dir_data.is_empty() {
-        return DirEntry::new(name, ObjType::Tree, actual_hash, path, None);
+        return Ok(DirEntry::new(name, ObjType::Tree, actual_hash, path, None));
     }
 
     let children = dir_data
         .iter()
         .map(|x| {
             if x.file_type == "tree".to_string() {
-                return gen_tree(
+                gen_tree(
                     x.hash.to_string(),
                     x.file_name.clone(),
                     path.join(x.file_name.clone()),
-                );
+                )
+                .unwrap()
             } else {
                 return DirEntry::new(
                     x.file_name.clone(),
@@ -152,7 +154,13 @@ pub fn gen_tree(hash: String, name: String, path: PathBuf) -> DirEntry {
         })
         .collect::<Vec<DirEntry>>();
 
-    return DirEntry::new(name, ObjType::Tree, actual_hash, path, Some(children));
+    return Ok(DirEntry::new(
+        name,
+        ObjType::Tree,
+        actual_hash,
+        path,
+        Some(children),
+    ));
 }
 
 pub fn show_tree(entry: &DirEntry, count: usize) {
@@ -183,12 +191,21 @@ pub fn write_entry(entry: DirEntry) {
     }
 }
 
-pub fn read_commit(hash: String) {
-    let actual_hash = get_actual_hash(&hash);
+pub fn read_commit(hash: String) -> Result<(), IOError> {
+    let actual_hash = get_actual_hash(&hash)?;
+    if actual_hash == "initial" {
+        return Err(IOError::new(
+            IOErrorKind::Other,
+            "No commits in current repo",
+        ));
+    }
 
     let [type_, data] = get_data(&actual_hash, "./.yeet/objects".to_string()).unwrap();
     if String::from_utf8(type_).unwrap() != "commit" {
-        panic!("Invalid commit or tag found {}", actual_hash);
+        return Err(IOError::new(
+            IOErrorKind::InvalidData,
+            format!("Invalid commit or tag found {}", actual_hash),
+        ));
     }
     let strings = String::from_utf8(data).unwrap();
     let mut data = strings.split("\n").map(|x| x.to_string());
@@ -207,15 +224,20 @@ pub fn read_commit(hash: String) {
 
     if parent_hash != "initial" {
         print!("\n");
-        read_commit(parent_hash);
+        read_commit(parent_hash)?;
     }
+
+    Ok(())
 }
 
-pub fn get_commit_tree(hash: &String) -> String {
-    let actual_hash = get_actual_hash(hash);
-    let [type_, data] = get_data(&actual_hash, "./.yeet/objects".to_string()).unwrap();
+pub fn get_commit_tree(hash: &String) -> Result<String, IOError> {
+    let actual_hash = get_actual_hash(hash)?;
+    let [type_, data] = get_data(&actual_hash, "./.yeet/objects".to_string())?;
     if String::from_utf8(type_).unwrap() != "commit" {
-        panic!("Invalid commit hash or tag {}", hash);
+        return Err(IOError::new(
+            IOErrorKind::InvalidData,
+            format!("Invalid commit or hash : {}", hash),
+        ));
     }
     let strings = String::from_utf8(data).unwrap();
     let mut commit_data = strings.split("\n").map(|x| x.to_string());
@@ -226,44 +248,34 @@ pub fn get_commit_tree(hash: &String) -> String {
         .unwrap()
         .1
         .to_string();
-    return tree_hash;
+    return Ok(tree_hash);
 }
 
-pub fn get_tag(tag: &String) -> Result<String, String> {
+pub fn get_tag(tag: &String) -> Result<String, IOError> {
     let id = fs::read_to_string(PathBuf::from("./.yeet/tags").join(&tag));
-
-    match id {
-        Ok(tag) => return Ok(tag),
-        Err(e) => return Err(format!("Error reading tag {} : {}", tag, e.to_string())),
-    }
+    return id;
 }
 
-pub fn set_tag(tag: String, hash: String) -> Result<(), String> {
-    if let Ok(_) = tag.parse::<u64>() {
-        return Err(format!("Cannot use integer as tag name: {}", tag));
-    }
-
+pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
     let [type_, _] = get_data(&hash, "./.yeet/objects".to_string())?;
     if String::from_utf8(type_).unwrap() != "commit" {
-        return Err(format!("Invalid commit hash {}", hash));
+        return Err(IOError::new(
+            IOErrorKind::InvalidData,
+            "Invalid commit object found",
+        ));
     }
-    let tag_file = fs::File::create(PathBuf::from("./.yeet/tags").join(&tag));
-    if let Err(e) = tag_file {
-        return Err(format!("Failed to set tag {}: {}", tag, e.to_string()));
-    }
+    let mut tag_file = fs::File::create(PathBuf::from("./.yeet/tags").join(&tag))?;
 
-    let res = tag_file.unwrap().write(hash.as_bytes());
-    if let Err(e) = res {
-        return Err(format!("Failed to set tag {}: {}", tag, e.to_string()));
-    }
+    tag_file.write(hash.as_bytes())?;
 
     Ok(())
 }
 
-fn get_actual_hash(hash: &String) -> String {
+fn get_actual_hash(hash: &String) -> Result<String, IOError> {
     if let Err(_) = hash.parse::<u64>() {
-        return get_tag(&hash).unwrap();
+        let actual_hash = get_tag(&hash)?;
+        return Ok(actual_hash);
     } else {
-        return hash.clone();
+        return Ok(hash.clone());
     }
 }

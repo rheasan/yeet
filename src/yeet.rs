@@ -1,10 +1,11 @@
-use std::{env, fs, io::Write, path::PathBuf};
+use std::{env, fs, io::Write, path::PathBuf, process::exit};
 
 use time::OffsetDateTime;
 
 use crate::data::{self, hash_dir, read_commit, write_obj_hash, FileData};
 
 pub fn init_repo() {
+    const INITIAL_HEAD: &[u8] = "initial".as_bytes();
     let res = fs::create_dir("./.yeet");
     match res {
         Err(e) => {
@@ -25,7 +26,9 @@ pub fn init_repo() {
 
     fs::create_dir("./.yeet/tags").expect("Error creating tags");
 
-    fs::File::create("./.yeet/tags/HEAD").expect("Error setting head");
+    let mut head = fs::File::create("./.yeet/tags/HEAD").expect("Error setting head");
+
+    head.write(INITIAL_HEAD).expect("Error setting head");
 }
 
 pub fn cat_file(hash: &String) {
@@ -47,18 +50,18 @@ pub fn cat_file(hash: &String) {
     }
 }
 
-pub fn hash_file(path: PathBuf, show_out: bool) -> u64 {
-    let file_data = fs::read(&path).expect("Error reading file");
+pub fn hash_file(path: PathBuf, show_out: bool) -> Result<u64, std::io::Error> {
+    let file_data = fs::read(&path)?;
     // println!("{:?}", file_data);
-    let hash = write_obj_hash(&file_data, "blob".to_string());
+    let hash = write_obj_hash(&file_data, "blob".to_string())?;
 
     if show_out {
         println!("blob {} {:?}", hash, path.file_name().unwrap());
     }
-    return hash;
+    return Ok(hash);
 }
 
-pub fn write_tree(path: PathBuf) -> u64 {
+pub fn write_tree(path: PathBuf) -> Result<u64, std::io::Error> {
     let dir_entries = fs::read_dir(path.to_owned()).expect("Failed to read directory");
     let mut cur_dir_data: Vec<FileData> = vec![];
 
@@ -85,15 +88,15 @@ pub fn write_tree(path: PathBuf) -> u64 {
         let file_metadata = entry.metadata().expect("Failed to read metadata");
 
         if file_metadata.is_dir() {
-            let hash = write_tree(entry.path());
+            let hash = write_tree(entry.path())?;
             let d = FileData {
                 file_name: filename,
                 file_type: "tree".to_string(),
                 hash,
             };
-            cur_dir_data.push(d);
+            cur_dir_data.push(d)
         } else {
-            let hash = hash_file(entry.path(), false);
+            let hash = hash_file(entry.path(), false)?;
             let d = FileData {
                 file_name: filename,
                 file_type: "blob".to_string(),
@@ -110,12 +113,17 @@ pub fn read_tree(hash: String, write_dir: PathBuf) {
     let write_dir_name = format!("{:?}", write_dir.as_os_str());
     let root_dir = data::gen_tree(hash, write_dir_name, write_dir.to_owned());
 
+    if let Err(e) = root_dir {
+        println!("Error: {}", e.to_string());
+        exit(1);
+    }
+
     if fs::try_exists(write_dir.to_owned()).expect("Unable to read dir") {
         fs::remove_dir_all(write_dir.to_owned()).expect("Unable to remove previous revision");
     }
 
     fs::create_dir_all(write_dir.to_owned()).expect("Unable to make dir");
-    data::write_entry(root_dir);
+    data::write_entry(root_dir.unwrap());
 }
 
 pub fn set_author(name: String) {
@@ -127,24 +135,35 @@ pub fn set_author(name: String) {
     println!("Set author name to {}", name);
 }
 
-pub fn commit(message: String) {
-    let author = fs::read_to_string(PathBuf::from("./.yeet/repo_data/author"))
-        .expect("Unable to read author name");
+pub fn commit(message: String) -> Result<(), std::io::Error> {
+    let author = fs::read_to_string(PathBuf::from("./.yeet/repo_data/author"));
+    if let Err(_) = author {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Author name not found",
+        ));
+    }
     let time = OffsetDateTime::now_utc();
     let mut parent = data::get_tag(&"HEAD".to_string()).unwrap();
     if parent == "" {
         parent = "initial".to_string();
     }
-    let id = write_tree(PathBuf::from("."));
+    let id = write_tree(PathBuf::from("."))?;
     let commit_data = format!(
         "tree {}\nparent {}\nauthor {}\ntime {:?}\n{}",
-        id, parent, author, time, message
+        id,
+        parent,
+        author.unwrap(),
+        time,
+        message
     );
-    let commit_id = data::write_obj_hash(commit_data.as_bytes(), "commit".to_string());
+    let commit_id = data::write_obj_hash(commit_data.as_bytes(), "commit".to_string())?;
 
     data::set_tag("HEAD".to_string(), commit_id.to_string()).unwrap();
     println!("commit id: {}", commit_id);
     println!("{}", message);
+
+    Ok(())
 }
 
 pub fn log(commit_id: Option<String>) {
@@ -155,21 +174,37 @@ pub fn log(commit_id: Option<String>) {
         }
         None => {
             hash = data::get_tag(&"HEAD".to_string()).unwrap();
+            // no commits
+            if hash == "initial" {
+                eprintln!("Error: repo has no commits");
+                return;
+            }
         }
     }
-    read_commit(hash);
+    let res = read_commit(hash);
+    if let Err(e) = res {
+        eprintln!("Error: {}", e);
+    }
 }
 
 pub fn checkout(commit_id: String) {
     let tree_hash = data::get_commit_tree(&commit_id);
-    data::set_tag("HEAD".to_string(), commit_id).unwrap();
-    read_tree(tree_hash, PathBuf::from("./restored"));
+    if let Err(e) = tree_hash {
+        eprintln!("Error: {}", e.to_string());
+    } else {
+        data::set_tag("HEAD".to_string(), commit_id).expect("Failed to set head");
+        read_tree(tree_hash.unwrap(), PathBuf::from("./restored"));
+    }
 }
 
 pub fn tag_commit(tag: String, hash: String) {
     println!("tag {} hash {}", tag, hash);
+    if let Ok(_) = tag.parse::<u64>() {
+        eprintln!("Cannot use integer as tag name: {}", tag);
+        return;
+    }
     let res = data::set_tag(tag, hash);
     if let Err(e) = res {
-        println!("{}", e);
+        eprintln!("{}", e);
     }
 }

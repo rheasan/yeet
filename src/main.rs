@@ -28,7 +28,7 @@ fn main() {
                 let file_path = config.args;
                 match file_path {
                     Some(path) => {
-                        yeet::hash_file(PathBuf::from(&path[0]), true);
+                        yeet::hash_file(PathBuf::from(&path[0]), true).unwrap();
                     }
                     None => {
                         unreachable!();
@@ -36,7 +36,7 @@ fn main() {
                 }
             }
             cli::Options::WriteTree => {
-                let rev_id = yeet::write_tree(PathBuf::from("."));
+                let rev_id = yeet::write_tree(PathBuf::from(".")).expect("Error writing tree");
                 println!("New revision id: {}", rev_id);
             }
             cli::Options::ReadTree => {
@@ -49,7 +49,9 @@ fn main() {
             }
             cli::Options::Commit => {
                 let message = config.args.unwrap()[0].clone();
-                yeet::commit(message);
+                if let Err(e) = yeet::commit(message) {
+                    println!("Error: {}", e);
+                }
             }
             cli::Options::Log => match config.args {
                 None => yeet::log(None),
