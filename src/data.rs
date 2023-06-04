@@ -267,7 +267,7 @@ pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
     }
     let mut tag_file = fs::File::create(PathBuf::from("./.yeet/tags").join(&tag))?;
 
-    tag_file.write(hash.as_bytes())?;
+    tag_file.write(actual_hash.as_bytes())?;
 
     Ok(())
 }
