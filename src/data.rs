@@ -257,7 +257,8 @@ pub fn get_tag(tag: &String) -> Result<String, IOError> {
 }
 
 pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
-    let [type_, _] = get_data(&hash, "./.yeet/objects".to_string())?;
+    let actual_hash = get_actual_hash(&hash)?;
+    let [type_, _] = get_data(&actual_hash, "./.yeet/objects".to_string())?;
     if String::from_utf8(type_).unwrap() != "commit" {
         return Err(IOError::new(
             IOErrorKind::InvalidData,
@@ -274,6 +275,9 @@ pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
 fn get_actual_hash(hash: &String) -> Result<String, IOError> {
     if let Err(_) = hash.parse::<u64>() {
         let actual_hash = get_tag(&hash)?;
+        if actual_hash == "initial" {
+            return Err(IOError::new(IOErrorKind::InvalidData, "No commits to tag"));
+        }
         return Ok(actual_hash);
     } else {
         return Ok(hash.clone());

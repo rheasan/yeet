@@ -166,22 +166,8 @@ pub fn commit(message: String) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-pub fn log(commit_id: Option<String>) {
-    let hash: String;
-    match commit_id {
-        Some(a) => {
-            hash = a;
-        }
-        None => {
-            hash = data::get_tag(&"HEAD".to_string()).unwrap();
-            // no commits
-            if hash == "initial" {
-                eprintln!("Error: repo has no commits");
-                return;
-            }
-        }
-    }
-    let res = read_commit(hash);
+pub fn log(commit_id: String) {
+    let res = read_commit(commit_id);
     if let Err(e) = res {
         eprintln!("Error: {}", e);
     }
@@ -200,11 +186,11 @@ pub fn checkout(commit_id: String) {
 pub fn tag_commit(tag: String, hash: String) {
     println!("tag {} hash {}", tag, hash);
     if let Ok(_) = tag.parse::<u64>() {
-        eprintln!("Cannot use integer as tag name: {}", tag);
+        eprintln!("Error: Cannot use integer as tag name: {}", tag);
         return;
     }
     let res = data::set_tag(tag, hash);
     if let Err(e) = res {
-        eprintln!("{}", e);
+        eprintln!("Error: {}", e);
     }
 }

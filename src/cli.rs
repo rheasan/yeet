@@ -128,9 +128,10 @@ pub fn parse_args(args: &Vec<String>) -> Option<Config> {
             print_help();
             return None;
         } else if args.len() == 2 {
+            // if a commit id was not provided then pass HEAD as default
             return Some(Config {
                 command: Options::Log,
-                args: None,
+                args: Some(vec!["HEAD".to_string()]),
             });
         } else if args.len() == 3 {
             return Some(Config {
@@ -158,11 +159,13 @@ pub fn parse_args(args: &Vec<String>) -> Option<Config> {
             println!("Too many arguments");
             print_help();
             return None;
-        } else if args.len() != 4 {
-            println!("No commit id provided");
-            print_help();
-            return None;
-        } else {
+        } else if args.len() == 3 {
+            return Some(Config {
+                command: Options::Tag,
+                // if a hash wasnt provided then pass HEAD as default
+                args: Some(vec![args[2].clone(), "HEAD".to_string()]),
+            });
+        } else if args.len() == 4 {
             return Some(Config {
                 command: Options::Tag,
                 args: Some(args.get(2..).unwrap().to_vec()),

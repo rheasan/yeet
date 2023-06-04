@@ -53,17 +53,19 @@ fn main() {
                     println!("Error: {}", e);
                 }
             }
-            cli::Options::Log => match config.args {
-                None => yeet::log(None),
-                Some(args) => yeet::log(Some(args[0].clone())),
-            },
+            cli::Options::Log => {
+                let hash = config.args.unwrap()[0].clone();
+                yeet::log(hash);
+            }
             cli::Options::Checkout => {
                 let hash = config.args.unwrap()[0].clone();
                 yeet::checkout(hash);
             }
             cli::Options::Tag => {
                 let args = config.args.unwrap();
-                yeet::tag_commit(args[0].clone(), args[1].clone());
+                let tag = args[0].clone();
+                let hash = args[1].clone();
+                yeet::tag_commit(tag, hash);
             }
         }
     }
