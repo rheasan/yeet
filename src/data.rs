@@ -252,7 +252,7 @@ pub fn get_commit_tree(hash: &String) -> Result<String, IOError> {
 }
 
 pub fn get_tag(tag: &String) -> Result<String, IOError> {
-    let id = fs::read_to_string(PathBuf::from("./.yeet/tags").join(&tag));
+    let id = fs::read_to_string(PathBuf::from("./.yeet/refs/tags").join(&tag));
     return id;
 }
 
@@ -265,7 +265,7 @@ pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
             "Invalid commit object found",
         ));
     }
-    let mut tag_file = fs::File::create(PathBuf::from("./.yeet/tags").join(&tag))?;
+    let mut tag_file = fs::File::create(PathBuf::from("./.yeet/refs/tags").join(&tag))?;
 
     tag_file.write(actual_hash.as_bytes())?;
 

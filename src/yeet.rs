@@ -24,9 +24,9 @@ pub fn init_repo() {
 
     fs::create_dir("./.yeet/repo_data").expect("Error creating repo_data");
 
-    fs::create_dir("./.yeet/tags").expect("Error creating tags");
+    fs::create_dir_all("./.yeet/refs/tags").expect("Error creating tags");
 
-    let mut head = fs::File::create("./.yeet/tags/HEAD").expect("Error setting head");
+    let mut head = fs::File::create("./.yeet/refs/tags/HEAD").expect("Error setting head");
 
     head.write(INITIAL_HEAD).expect("Error setting head");
 }
