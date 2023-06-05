@@ -276,7 +276,10 @@ fn get_actual_hash(hash: &String) -> Result<String, IOError> {
     if let Err(_) = hash.parse::<u64>() {
         let actual_hash = get_tag(&hash)?;
         if actual_hash == "initial" {
-            return Err(IOError::new(IOErrorKind::InvalidData, "No commits to tag"));
+            return Err(IOError::new(
+                IOErrorKind::InvalidData,
+                "No commits found in the repo",
+            ));
         }
         return Ok(actual_hash);
     } else {
