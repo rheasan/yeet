@@ -2,7 +2,7 @@ use std::{env, fs, io::Write, path::PathBuf, process::exit};
 
 use time::OffsetDateTime;
 
-use crate::data::{self, hash_dir, read_commit, write_obj_hash, FileData};
+use crate::data::{self, hash_dir, write_obj_hash, FileData};
 
 pub fn init_repo() {
     const INITIAL_HEAD: &[u8] = "initial".as_bytes();
@@ -167,7 +167,7 @@ pub fn commit(message: String) -> Result<(), std::io::Error> {
 }
 
 pub fn log(commit_id: String) {
-    let res = read_commit(commit_id);
+    let res = data::log(commit_id);
     if let Err(e) = res {
         eprintln!("Error: {}", e);
     }

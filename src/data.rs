@@ -235,7 +235,7 @@ pub fn write_entry(entry: DirEntry) {
     }
 }
 
-pub fn read_commit(hash: String) -> Result<(), IOError> {
+fn read_commit(hash: String) -> Result<(), IOError> {
     let actual_hash = get_actual_hash(&hash)?;
     if actual_hash == "initial" {
         return Err(IOError::new(
@@ -255,8 +255,8 @@ pub fn read_commit(hash: String) -> Result<(), IOError> {
     let mut data = strings.split("\n").map(|x| x.to_string());
 
     // TODO: fix this iter monster
-    let _ = data.next().unwrap().split_once(" ").unwrap().1.to_string();
-    let parent_hash = data.next().unwrap().split_once(" ").unwrap().1.to_string();
+    let _commit_tree = data.next().unwrap().split_once(" ").unwrap().1.to_string();
+    let _parent_hash = data.next().unwrap().split_once(" ").unwrap().1.to_string();
     let author_name = data.next().unwrap().split_once(" ").unwrap().1.to_string();
     let time = data.next().unwrap().split_once(" ").unwrap().1.to_string();
     let message = data.collect::<Vec<_>>().concat();
@@ -265,12 +265,27 @@ pub fn read_commit(hash: String) -> Result<(), IOError> {
     println!("Author: {}", author_name);
     println!("Date: {}", time);
     println!("{}", message);
+    print!("\n");
+    Ok(())
+}
 
-    if parent_hash != "initial" {
-        print!("\n");
-        read_commit(parent_hash)?;
+
+pub fn log(hash: String) -> Result<(), IOError>{
+    let oids = VecDeque::from([hash]);
+    let mut visited: HashSet<String> = HashSet::new();
+
+    oids.iter().for_each(|x| {
+        visited.insert(x.clone());
+    });
+    let iter_gen = YeetRefIterGen {
+        oids,
+        visited
+    };
+
+
+    for i in iter_gen.into_iter() {
+        read_commit(i.oid)?;
     }
-
     Ok(())
 }
 
@@ -295,6 +310,7 @@ pub fn get_commit_tree(hash: &String) -> Result<String, IOError> {
     return Ok(tree_hash);
 }
 fn get_commit_parent(commit_id: &String) -> Result<String, IOError> {
+    let commit_id = get_actual_hash(&commit_id)?;
     let [type_, data] = get_data(&commit_id, "./.yeet/objects".to_string()).unwrap();
     if String::from_utf8(type_).unwrap() != "commit" {
         return Err(IOError::new(
