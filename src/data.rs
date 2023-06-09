@@ -391,7 +391,6 @@ pub fn print_all_refs() -> Result<(), IOError> {
     for i in iter_gen.into_iter() {
         dot += format!("{} [shape=box style=filled label={}]\n", i.oid, i.oid).as_str();
         dot += format!("{} -> {}\n", i.oid, i.parent).as_str();
-        println!("Commit id: {}, parent: {}", i.oid, i.parent);
     }
     dot += "}";
     println!("{}", dot);
