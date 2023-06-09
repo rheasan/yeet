@@ -9,6 +9,7 @@ pub enum Options {
     Log,
     Checkout,
     Tag,
+    K, //gitk
 }
 
 pub struct Config {
@@ -171,8 +172,23 @@ pub fn parse_args(args: &Vec<String>) -> Option<Config> {
                 args: Some(args.get(2..).unwrap().to_vec()),
             });
         }
+    } else if args[1] == "k" {
+        if args.len() > 3 {
+            println!("Too many arguments");
+            print_help();
+            return None;
+        } else if args.len() == 2 {
+            return Some(Config {
+                command: Options::K,
+                args: None,
+            });
+        } else if args.len() == 3 {
+            return Some(Config {
+                command: Options::K,
+                args: Some(vec![args[2].clone()]),
+            });
+        }
     }
-
     println!("Bad arguments");
     print_help();
     return None;

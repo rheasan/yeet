@@ -67,6 +67,9 @@ fn main() {
                 let hash = args[1].clone();
                 yeet::tag_commit(tag, hash);
             }
+            cli::Options::K => {
+                yeet::k();
+            }
         }
     }
 }

@@ -1,10 +1,12 @@
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
 use std::io::Error as IOError;
 use std::io::ErrorKind as IOErrorKind;
 use std::io::Write;
 use std::path::PathBuf;
+use walkdir::WalkDir;
 
 const SEPARATOR: u8 = 0x00u8;
 #[derive(Debug, PartialEq)]
@@ -43,6 +45,48 @@ impl DirEntry {
             hash,
             children,
         }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+pub struct YeetRef {
+    pub ref_name: String,
+    pub ref_data: String,
+}
+pub struct Commit {
+    pub oid: String,
+    pub parent: String,
+}
+
+// there is probably a better way of doing this
+// iterator that yields all commits that can be reached by following parent chain of given ids
+struct YeetRefIterGen {
+    pub oids: Vec<String>,
+    pub visited: HashSet<String>,
+}
+
+impl Iterator for YeetRefIterGen {
+    type Item = Commit;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.oids.len() == 0 {
+            return None;
+        }
+
+        let oid = self.oids.pop().unwrap();
+        let parent: String;
+        if let Ok(a) = get_commit_parent(&oid) {
+            parent = a;
+        } else {
+            return None;
+        }
+        let is_new_insert = self.visited.insert(parent.clone());
+        if is_new_insert && !self.oids.contains(&parent) && parent != "initial" {
+            self.oids.push(parent.clone());
+        }
+        return Some(Commit{
+            oid,
+            parent
+        })
     }
 }
 
@@ -250,7 +294,22 @@ pub fn get_commit_tree(hash: &String) -> Result<String, IOError> {
         .to_string();
     return Ok(tree_hash);
 }
+fn get_commit_parent(commit_id: &String) -> Result<String, IOError> {
+    let [type_, data] = get_data(&commit_id, "./.yeet/objects".to_string()).unwrap();
+    if String::from_utf8(type_).unwrap() != "commit" {
+        return Err(IOError::new(
+            IOErrorKind::InvalidData,
+            format!("Invalid commit or tag found {}", commit_id),
+        ));
+    }
+    let strings = String::from_utf8(data).unwrap();
+    let mut data = strings.split("\n").map(|x| x.to_string());
 
+    // TODO: fix this iter monster
+    let _ = data.next().unwrap().split_once(" ").unwrap().1.to_string();
+    let parent_hash = data.next().unwrap().split_once(" ").unwrap().1.to_string();
+    Ok(parent_hash)
+}
 pub fn get_tag(tag: &String) -> Result<String, IOError> {
     let id = fs::read_to_string(PathBuf::from("./.yeet/refs/tags").join(&tag));
     return id;
@@ -285,4 +344,56 @@ fn get_actual_hash(hash: &String) -> Result<String, IOError> {
     } else {
         return Ok(hash.clone());
     }
+}
+
+fn get_all_refs() -> Result<Vec<YeetRef>, IOError> {
+    let mut refs: Vec<YeetRef> = vec![];
+    for i in WalkDir::new("./.yeet/refs/") {
+        let entry = i?;
+        if entry.metadata()?.is_dir() {
+            continue;
+        }
+        let ref_data = fs::read_to_string(entry.path())?;
+        let r = YeetRef {
+            ref_data,
+            ref_name: format!("{:?}", entry.file_name()),
+        };
+        refs.push(r);
+    }
+    Ok(refs)
+}
+
+pub fn print_all_refs() -> Result<(), IOError> {
+    // https://graphviz.org/doc/info/lang.html
+    let refs = get_all_refs()?;
+    let mut oids: Vec<String> = vec![];
+    let mut dot = String::from("digraph commits {\n");
+    for yeet_ref in refs {
+        oids.push(yeet_ref.ref_data.clone());
+        dot += format!("{} [shape=note]\n{} -> {}\n", yeet_ref.ref_name, yeet_ref.ref_name, yeet_ref.ref_data).as_str();
+    }
+    // remove all duplicate oids. probably some better way of doing this
+    oids.sort();
+    oids.dedup();
+
+
+    let mut visited = HashSet::new();
+    oids.iter().for_each(|x| {
+        visited.insert(x.clone());
+    });
+
+
+    let iter_gen = YeetRefIterGen {
+        oids,
+        visited
+    };
+
+    for i in iter_gen.into_iter() {
+        dot += format!("{} [shape=box style=filled label={}]\n", i.oid, i.oid).as_str();
+        dot += format!("{} -> {}\n", i.oid, i.parent).as_str();
+        println!("Commit id: {}, parent: {}", i.oid, i.parent);
+    }
+    dot += "}";
+    println!("{}", dot);
+    Ok(())
 }

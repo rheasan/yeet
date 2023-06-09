@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 time = "0.3.21"
+walkdir = "2.3.3"

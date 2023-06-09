@@ -194,3 +194,9 @@ pub fn tag_commit(tag: String, hash: String) {
         eprintln!("Error: {}", e);
     }
 }
+
+pub fn k() {
+    if let Err(e) = data::print_all_refs() {
+        eprintln!("Error: {}", e);
+    }
+}
