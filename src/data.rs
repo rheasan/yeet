@@ -1,5 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
 use std::io::Error as IOError;
@@ -61,7 +61,7 @@ pub struct Commit {
 // there is probably a better way of doing this
 // iterator that yields all commits that can be reached by following parent chain of given ids
 struct YeetRefIterGen {
-    pub oids: Vec<String>,
+    pub oids: VecDeque<String>,
     pub visited: HashSet<String>,
 }
 
@@ -72,7 +72,7 @@ impl Iterator for YeetRefIterGen {
             return None;
         }
 
-        let oid = self.oids.pop().unwrap();
+        let oid = self.oids.pop_front().unwrap();
         let parent: String;
         if let Ok(a) = get_commit_parent(&oid) {
             parent = a;
@@ -81,7 +81,7 @@ impl Iterator for YeetRefIterGen {
         }
         let is_new_insert = self.visited.insert(parent.clone());
         if is_new_insert && !self.oids.contains(&parent) && parent != "initial" {
-            self.oids.push(parent.clone());
+            self.oids.push_front(parent.clone());
         }
         return Some(Commit{
             oid,
@@ -360,21 +360,21 @@ fn get_all_refs() -> Result<Vec<YeetRef>, IOError> {
         };
         refs.push(r);
     }
+    // remove duplicates TODO: find better way of doing this
+    refs.sort();
+    refs.dedup();
     Ok(refs)
 }
 
 pub fn print_all_refs() -> Result<(), IOError> {
     // https://graphviz.org/doc/info/lang.html
     let refs = get_all_refs()?;
-    let mut oids: Vec<String> = vec![];
+    let mut oids: VecDeque<String> = VecDeque::new();
     let mut dot = String::from("digraph commits {\n");
     for yeet_ref in refs {
-        oids.push(yeet_ref.ref_data.clone());
+        oids.push_back(yeet_ref.ref_data.clone());
         dot += format!("{} [shape=note]\n{} -> {}\n", yeet_ref.ref_name, yeet_ref.ref_name, yeet_ref.ref_data).as_str();
     }
-    // remove all duplicate oids. probably some better way of doing this
-    oids.sort();
-    oids.dedup();
 
 
     let mut visited = HashSet::new();
