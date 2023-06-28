@@ -92,6 +92,7 @@ impl Iterator for YeetRefIterGen {
     }
 }
 
+// makes a single object from vec of FileData objects and writes it as a tree object
 pub fn hash_dir(data: &Vec<FileData>) -> Result<u64, IOError> {
     let strings = data
         .iter()
@@ -104,6 +105,7 @@ pub fn hash_dir(data: &Vec<FileData>) -> Result<u64, IOError> {
     return write_obj_hash(strings.as_bytes(), "tree".to_string());
 }
 
+// writes an objects with given data and type and returns its hash
 pub fn write_obj_hash(data: &[u8], type_: String) -> Result<u64, IOError> {
     let mut s = DefaultHasher::new();
     data.hash(&mut s);
@@ -119,6 +121,7 @@ pub fn write_obj_hash(data: &[u8], type_: String) -> Result<u64, IOError> {
 }
 
 // TODO: find better way to do this
+// reads the file_type and data from objects
 pub fn get_data(hash: &String, path_prefix: String) -> Result<ObjData, IOError> {
     let file_path = PathBuf::from(path_prefix).join(hash);
 
@@ -134,6 +137,7 @@ pub fn get_data(hash: &String, path_prefix: String) -> Result<ObjData, IOError> 
     })
 }
 
+// reads a tree object from hash and generates vec of files/dirs
 fn decode_dir_data(hash: &String) -> Result<Vec<FileData>, IOError> {
     let data = get_data(hash, "./.yeet/objects".to_string())?.file_data;
     let strings = String::from_utf8(data.to_vec()).unwrap();
@@ -174,6 +178,7 @@ fn decode_dir_data(hash: &String) -> Result<Vec<FileData>, IOError> {
     return Ok(data);
 }
 
+// recursively generates tree of all files from the given hash
 pub fn gen_tree(hash: String, name: String, path: PathBuf) -> Result<DirEntry, IOError> {
     let actual_hash = get_actual_hash(&hash)?;
     let dir_data = decode_dir_data(&actual_hash)?;
@@ -212,6 +217,7 @@ pub fn gen_tree(hash: String, name: String, path: PathBuf) -> Result<DirEntry, I
     ));
 }
 
+// prints the tree generated from gen_tree
 pub fn show_tree(entry: &DirEntry, count: usize) {
     let padding = String::from("\t").repeat(count);
     println!("{}Name: {}", padding, entry.name);
@@ -225,6 +231,7 @@ pub fn show_tree(entry: &DirEntry, count: usize) {
     }
 }
 
+// writes given direntry to the file system
 pub fn write_entry(entry: DirEntry) {
     if entry.type_ == ObjType::Blob {
         let file_data = get_data(&entry.hash, String::from("./.yeet/objects/"))
@@ -242,6 +249,7 @@ pub fn write_entry(entry: DirEntry) {
     }
 }
 
+// reads and prints info of a single commit
 fn read_commit(hash: String) -> Result<(), IOError> {
     let actual_hash = get_actual_hash(&hash)?;
     if actual_hash == "initial" {
@@ -276,6 +284,7 @@ fn read_commit(hash: String) -> Result<(), IOError> {
     Ok(())
 }
 
+// writes info of all commits in the parent tree of commit with given hash
 pub fn log(hash: String) -> Result<(), IOError> {
     let oids = VecDeque::from([hash]);
     let mut visited: HashSet<String> = HashSet::new();
@@ -291,6 +300,7 @@ pub fn log(hash: String) -> Result<(), IOError> {
     Ok(())
 }
 
+// returns the tree hash from a given commit
 pub fn get_commit_tree(hash: &String) -> Result<String, IOError> {
     let actual_hash = get_actual_hash(hash)?;
     let commit_data = get_data(&actual_hash, "./.yeet/objects".to_string())?;
@@ -311,6 +321,8 @@ pub fn get_commit_tree(hash: &String) -> Result<String, IOError> {
         .to_string();
     return Ok(tree_hash);
 }
+
+// returns hash of parent commit
 fn get_commit_parent(commit_id: &String) -> Result<String, IOError> {
     let commit_id = get_actual_hash(&commit_id)?;
     let commit_data = get_data(&commit_id, "./.yeet/objects".to_string()).unwrap();
@@ -328,11 +340,14 @@ fn get_commit_parent(commit_id: &String) -> Result<String, IOError> {
     let parent_hash = data.next().unwrap().split_once(" ").unwrap().1.to_string();
     Ok(parent_hash)
 }
+
+// returns data from existing tag
 pub fn get_tag(tag: &String) -> Result<String, IOError> {
     let id = fs::read_to_string(PathBuf::from("./.yeet/refs/tags").join(&tag));
     return id;
 }
 
+// sets a new tag with data (hash)
 pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
     let actual_hash = get_actual_hash(&hash)?;
     let type_ = get_data(&actual_hash, "./.yeet/objects".to_string())?.file_type;
@@ -349,6 +364,7 @@ pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
     Ok(())
 }
 
+// if input was not u64 then attempts to read the hash by treating input as a tag
 fn get_actual_hash(hash: &String) -> Result<String, IOError> {
     if let Err(_) = hash.parse::<u64>() {
         let actual_hash = get_tag(&hash)?;
@@ -364,6 +380,7 @@ fn get_actual_hash(hash: &String) -> Result<String, IOError> {
     }
 }
 
+// reads all saved refs
 fn get_all_refs() -> Result<Vec<YeetRef>, IOError> {
     let mut refs: Vec<YeetRef> = vec![];
     for i in WalkDir::new("./.yeet/refs/") {
@@ -384,8 +401,9 @@ fn get_all_refs() -> Result<Vec<YeetRef>, IOError> {
     Ok(refs)
 }
 
+// generates graph from refs read by get_all_refs()
+// https://graphviz.org/doc/info/lang.html
 pub fn print_all_refs() -> Result<(), IOError> {
-    // https://graphviz.org/doc/info/lang.html
     let refs = get_all_refs()?;
     let mut oids: VecDeque<String> = VecDeque::new();
     let mut dot = String::from("digraph commits {\n");
