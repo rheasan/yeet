@@ -2,7 +2,7 @@ use std::{env, fs, io::Write, path::PathBuf, process::exit};
 
 use time::OffsetDateTime;
 
-use crate::data::{self, hash_dir, write_obj_hash, FileData};
+use crate::data::{self, FileData};
 
 pub fn init_repo() {
     const INITIAL_HEAD: &[u8] = "initial".as_bytes();
@@ -53,7 +53,7 @@ pub fn cat_file(hash: &String) {
 pub fn hash_file(path: PathBuf, show_out: bool) -> Result<u64, std::io::Error> {
     let file_data = fs::read(&path)?;
     // println!("{:?}", file_data);
-    let hash = write_obj_hash(&file_data, "blob".to_string())?;
+    let hash = data::write_obj_hash(&file_data, "blob".to_string())?;
 
     if show_out {
         println!("blob {} {:?}", hash, path.file_name().unwrap());
@@ -62,14 +62,14 @@ pub fn hash_file(path: PathBuf, show_out: bool) -> Result<u64, std::io::Error> {
 }
 
 pub fn write_tree(path: PathBuf) -> Result<u64, std::io::Error> {
-    let dir_entries = fs::read_dir(path.to_owned()).expect("Failed to read directory");
+    let dir_entries = fs::read_dir(path.clone()).expect("Failed to read directory");
     let mut cur_dir_data: Vec<FileData> = vec![];
 
-    let ignore_path = path.to_owned().join(".yeetignore");
+    let ignore_path = path.join(".yeetignore");
     let mut ignore_entries: Vec<String> = vec![String::from(".yeet")];
 
     if fs::try_exists(ignore_path.to_owned()).expect("cant read files") {
-        let mut other_entries = fs::read_to_string(ignore_path.to_owned())
+        let mut other_entries = fs::read_to_string(ignore_path)
             .unwrap()
             .split('\n')
             .map(|x| String::from(x))
@@ -106,7 +106,7 @@ pub fn write_tree(path: PathBuf) -> Result<u64, std::io::Error> {
         }
     }
 
-    return hash_dir(&cur_dir_data);
+    return data::hash_dir(&cur_dir_data);
 }
 
 pub fn read_tree(hash: String, write_dir: PathBuf) {
