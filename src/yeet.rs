@@ -36,9 +36,9 @@ pub fn cat_file(hash: &String) {
     match res {
         Ok(data) => {
             // data = [data_type, file_data]
-            println!("obj-type: {}", String::from_utf8(data[0].clone()).unwrap());
-            println!("file-data: {:?}", data[1]);
-            if let Ok(file_data) = String::from_utf8(data[1].clone()) {
+            println!("obj-type: {}", String::from_utf8(data.file_type).unwrap());
+            println!("file-data: {:?}", data.file_data);
+            if let Ok(file_data) = String::from_utf8(data.file_data) {
                 println!("ascii:\n{}", file_data);
             } else {
                 println!("no ascii")

@@ -16,6 +16,11 @@ pub enum ObjType {
     Commit,
 }
 
+pub struct ObjData {
+    pub file_type: Vec<u8>,
+    pub file_data: Vec<u8>,
+}
+
 pub struct FileData {
     pub file_name: String,
     pub file_type: String,
@@ -83,10 +88,7 @@ impl Iterator for YeetRefIterGen {
         if is_new_insert && !self.oids.contains(&parent) && parent != "initial" {
             self.oids.push_front(parent.clone());
         }
-        return Some(Commit{
-            oid,
-            parent
-        })
+        return Some(Commit { oid, parent });
     }
 }
 
@@ -117,7 +119,7 @@ pub fn write_obj_hash(data: &[u8], type_: String) -> Result<u64, IOError> {
 }
 
 // TODO: find better way to do this
-pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], IOError> {
+pub fn get_data(hash: &String, path_prefix: String) -> Result<ObjData, IOError> {
     let file_path = PathBuf::from(path_prefix).join(hash);
 
     let file_bytes = fs::read(&file_path)?;
@@ -126,11 +128,14 @@ pub fn get_data(hash: &String, path_prefix: String) -> Result<[Vec<u8>; 2], IOEr
     let file_type = bytes.next().unwrap().to_vec();
     let file_data = bytes.collect::<Vec<_>>().concat();
 
-    Ok([file_type, file_data])
+    Ok(ObjData {
+        file_type,
+        file_data,
+    })
 }
 
 fn decode_dir_data(hash: &String) -> Result<Vec<FileData>, IOError> {
-    let [_, data] = get_data(hash, "./.yeet/objects".to_string())?;
+    let data = get_data(hash, "./.yeet/objects".to_string())?.file_data;
     let strings = String::from_utf8(data.to_vec()).unwrap();
     let mut data: Vec<FileData> = Vec::new();
     for string in strings.split("\n") {
@@ -222,7 +227,9 @@ pub fn show_tree(entry: &DirEntry, count: usize) {
 
 pub fn write_entry(entry: DirEntry) {
     if entry.type_ == ObjType::Blob {
-        let [_, file_data] = get_data(&entry.hash, String::from("./.yeet/objects/")).unwrap();
+        let file_data = get_data(&entry.hash, String::from("./.yeet/objects/"))
+            .unwrap()
+            .file_data;
         let mut file = fs::File::create(entry.path).unwrap();
         file.write_all(file_data.as_slice()).unwrap();
     } else {
@@ -244,14 +251,14 @@ fn read_commit(hash: String) -> Result<(), IOError> {
         ));
     }
 
-    let [type_, data] = get_data(&actual_hash, "./.yeet/objects".to_string()).unwrap();
-    if String::from_utf8(type_).unwrap() != "commit" {
+    let commit_data = get_data(&actual_hash, "./.yeet/objects".to_string()).unwrap();
+    if String::from_utf8(commit_data.file_type).unwrap() != "commit" {
         return Err(IOError::new(
             IOErrorKind::InvalidData,
             format!("Invalid commit or tag found {}", actual_hash),
         ));
     }
-    let strings = String::from_utf8(data).unwrap();
+    let strings = String::from_utf8(commit_data.file_data).unwrap();
     let mut data = strings.split("\n").map(|x| x.to_string());
 
     // TODO: fix this iter monster
@@ -269,19 +276,14 @@ fn read_commit(hash: String) -> Result<(), IOError> {
     Ok(())
 }
 
-
-pub fn log(hash: String) -> Result<(), IOError>{
+pub fn log(hash: String) -> Result<(), IOError> {
     let oids = VecDeque::from([hash]);
     let mut visited: HashSet<String> = HashSet::new();
 
     oids.iter().for_each(|x| {
         visited.insert(x.clone());
     });
-    let iter_gen = YeetRefIterGen {
-        oids,
-        visited
-    };
-
+    let iter_gen = YeetRefIterGen { oids, visited };
 
     for i in iter_gen.into_iter() {
         read_commit(i.oid)?;
@@ -291,14 +293,14 @@ pub fn log(hash: String) -> Result<(), IOError>{
 
 pub fn get_commit_tree(hash: &String) -> Result<String, IOError> {
     let actual_hash = get_actual_hash(hash)?;
-    let [type_, data] = get_data(&actual_hash, "./.yeet/objects".to_string())?;
-    if String::from_utf8(type_).unwrap() != "commit" {
+    let commit_data = get_data(&actual_hash, "./.yeet/objects".to_string())?;
+    if String::from_utf8(commit_data.file_type).unwrap() != "commit" {
         return Err(IOError::new(
             IOErrorKind::InvalidData,
             format!("Invalid commit or hash : {}", hash),
         ));
     }
-    let strings = String::from_utf8(data).unwrap();
+    let strings = String::from_utf8(commit_data.file_data).unwrap();
     let mut commit_data = strings.split("\n").map(|x| x.to_string());
     let tree_hash = commit_data
         .next()
@@ -311,14 +313,14 @@ pub fn get_commit_tree(hash: &String) -> Result<String, IOError> {
 }
 fn get_commit_parent(commit_id: &String) -> Result<String, IOError> {
     let commit_id = get_actual_hash(&commit_id)?;
-    let [type_, data] = get_data(&commit_id, "./.yeet/objects".to_string()).unwrap();
-    if String::from_utf8(type_).unwrap() != "commit" {
+    let commit_data = get_data(&commit_id, "./.yeet/objects".to_string()).unwrap();
+    if String::from_utf8(commit_data.file_type).unwrap() != "commit" {
         return Err(IOError::new(
             IOErrorKind::InvalidData,
             format!("Invalid commit or tag found {}", commit_id),
         ));
     }
-    let strings = String::from_utf8(data).unwrap();
+    let strings = String::from_utf8(commit_data.file_data).unwrap();
     let mut data = strings.split("\n").map(|x| x.to_string());
 
     // TODO: fix this iter monster
@@ -333,7 +335,7 @@ pub fn get_tag(tag: &String) -> Result<String, IOError> {
 
 pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
     let actual_hash = get_actual_hash(&hash)?;
-    let [type_, _] = get_data(&actual_hash, "./.yeet/objects".to_string())?;
+    let type_ = get_data(&actual_hash, "./.yeet/objects".to_string())?.file_type;
     if String::from_utf8(type_).unwrap() != "commit" {
         return Err(IOError::new(
             IOErrorKind::InvalidData,
@@ -389,20 +391,19 @@ pub fn print_all_refs() -> Result<(), IOError> {
     let mut dot = String::from("digraph commits {\n");
     for yeet_ref in refs {
         oids.push_back(yeet_ref.ref_data.clone());
-        dot += format!("{} [shape=note]\n{} -> {}\n", yeet_ref.ref_name, yeet_ref.ref_name, yeet_ref.ref_data).as_str();
+        dot += format!(
+            "{} [shape=note]\n{} -> {}\n",
+            yeet_ref.ref_name, yeet_ref.ref_name, yeet_ref.ref_data
+        )
+        .as_str();
     }
-
 
     let mut visited = HashSet::new();
     oids.iter().for_each(|x| {
         visited.insert(x.clone());
     });
 
-
-    let iter_gen = YeetRefIterGen {
-        oids,
-        visited
-    };
+    let iter_gen = YeetRefIterGen { oids, visited };
 
     for i in iter_gen.into_iter() {
         dot += format!("{} [shape=box style=filled label={}]\n", i.oid, i.oid).as_str();
