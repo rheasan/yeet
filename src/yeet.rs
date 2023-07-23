@@ -26,7 +26,7 @@ pub fn init_repo() {
 
     fs::create_dir_all("./.yeet/refs/tags").expect("Error creating tags");
 
-    let mut head = fs::File::create("./.yeet/refs/tags/HEAD").expect("Error setting head");
+    let mut head = fs::File::create("./.yeet/refs/HEAD").expect("Error setting head");
 
     head.write(INITIAL_HEAD).expect("Error setting head");
 }
@@ -144,7 +144,7 @@ pub fn commit(message: String) -> Result<(), std::io::Error> {
         ));
     }
     let time = OffsetDateTime::now_utc();
-    let mut parent = data::get_tag(&"HEAD".to_string()).unwrap();
+    let mut parent = data::get_ref(&"HEAD".to_string(), PathBuf::new()).unwrap();
     if parent == "" {
         parent = "initial".to_string();
     }
@@ -159,7 +159,7 @@ pub fn commit(message: String) -> Result<(), std::io::Error> {
     );
     let commit_id = data::write_obj_hash(commit_data.as_bytes(), "commit".to_string())?;
 
-    data::set_tag("HEAD".to_string(), commit_id.to_string()).unwrap();
+    data::set_ref("HEAD".to_string(), commit_id.to_string(), PathBuf::new()).unwrap();
     println!("commit id: {}", commit_id);
     println!("{}", message);
 
@@ -178,7 +178,7 @@ pub fn checkout(commit_id: String) {
     if let Err(e) = tree_hash {
         eprintln!("Error: {}", e.to_string());
     } else {
-        data::set_tag("HEAD".to_string(), commit_id).expect("Failed to set head");
+        data::set_ref("HEAD".to_string(), commit_id, PathBuf::new()).expect("Failed to set head");
         read_tree(tree_hash.unwrap(), PathBuf::from("./restored"));
     }
 }
@@ -189,7 +189,7 @@ pub fn tag_commit(tag: String, hash: String) {
         eprintln!("Error: Cannot use integer as tag name: {}", tag);
         return;
     }
-    let res = data::set_tag(tag, hash);
+    let res = data::set_ref(tag, hash, PathBuf::from("tags"));
     if let Err(e) = res {
         eprintln!("Error: {}", e);
     }

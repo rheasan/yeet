@@ -342,13 +342,13 @@ fn get_commit_parent(commit_id: &String) -> Result<String, IOError> {
 }
 
 // returns data from existing tag
-pub fn get_tag(tag: &String) -> Result<String, IOError> {
-    let id = fs::read_to_string(PathBuf::from("./.yeet/refs/tags").join(&tag));
+pub fn get_ref(ref_name: &String, ref_path: PathBuf) -> Result<String, IOError> {
+    let id = fs::read_to_string(PathBuf::from("./.yeet/refs/").join(ref_path).join(&ref_name));
     return id;
 }
 
 // sets a new tag with data (hash)
-pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
+pub fn set_ref(ref_name: String, hash: String, ref_path: PathBuf) -> Result<(), IOError> {
     let actual_hash = get_actual_hash(&hash)?;
     let type_ = get_data(&actual_hash, "./.yeet/objects".to_string())?.file_type;
     if String::from_utf8(type_).unwrap() != "commit" {
@@ -357,7 +357,9 @@ pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
             "Invalid commit object found",
         ));
     }
-    let mut tag_file = fs::File::create(PathBuf::from("./.yeet/refs/tags").join(&tag))?;
+
+    let tag_path = PathBuf::from("./.yeet/refs").join(ref_path).join(&ref_name);
+    let mut tag_file = fs::File::create(tag_path)?;
 
     tag_file.write(actual_hash.as_bytes())?;
 
@@ -367,7 +369,13 @@ pub fn set_tag(tag: String, hash: String) -> Result<(), IOError> {
 // if input was not u64 then attempts to read the hash by treating input as a tag
 fn get_actual_hash(hash: &String) -> Result<String, IOError> {
     if let Err(_) = hash.parse::<u64>() {
-        let actual_hash = get_tag(&hash)?;
+        let actual_hash: String;
+        if hash == "HEAD" {
+            actual_hash = get_ref(&hash, PathBuf::new())?;
+        }
+        else {
+            actual_hash = get_ref(&hash, PathBuf::from("tags"))?;
+        }
         if actual_hash == "initial" {
             return Err(IOError::new(
                 IOErrorKind::InvalidData,
